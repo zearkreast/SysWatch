@@ -8,7 +8,7 @@ namespace SysWatch;
 // `SysWatch.exe --diag`: measures memory after each startup stage and writes %APPDATA%\SysWatch\diag.txt.
 internal static class Diagnostics
 {
-    // `SysWatch.exe --glass-shot <png> [dark]`: captures the main window and tray popup over a full-screen backdrop
+    // `SysWatch.exe --glass-shot <png> [dark] [en|tr]`: captures the main window and tray popup over a full-screen backdrop
     // of its own, so the composited glass (and the README screenshots) never include anything else on screen.
     public static void GlassShot(string output, bool dark)
     {
@@ -200,5 +200,6 @@ internal sealed class DiagHost : UI.IUiHost
     public void SaveAndApply(Config.AppConfig next) { }
     public void Mute(int minutes) { }
     public void OpenHistory() { }
+    public void OpenPage(int page) { }
     public void OpenSettings() { }
 }

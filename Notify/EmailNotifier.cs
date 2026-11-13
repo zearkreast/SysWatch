@@ -28,7 +28,7 @@ public sealed class EmailNotifier : INotifier
 
         // The subject is never encrypted, so it stays generic when PGP or minimal mode is on.
         var firstLine = text.Split('\n')[0];
-        message.Subject = pgp || e.Minimal ? "SysWatch bildirimi" : firstLine;
+        message.Subject = pgp || e.Minimal ? L.T("SysWatch bildirimi", "SysWatch notification") : firstLine;
 
         var inner = new TextPart("plain") { Text = text, ContentTransferEncoding = ContentEncoding.Base64 };
         message.Body = pgp ? Pgp.Encrypt(inner, e.PgpPublicKeyPath) : inner;
@@ -94,6 +94,6 @@ public static class Pgp
                         (k.GetValidSeconds() == 0 || k.CreationTime.AddSeconds(k.GetValidSeconds()) > DateTime.UtcNow))
             .ToList();
         return candidates.FirstOrDefault(k => !k.IsMasterKey) ?? candidates.FirstOrDefault()
-            ?? throw new InvalidOperationException("Bu dosyada geçerli bir PGP şifreleme anahtarı yok.");
+            ?? throw new InvalidOperationException(L.T("Bu dosyada geçerli bir PGP şifreleme anahtarı yok.", "This file holds no valid PGP encryption key."));
     }
 }

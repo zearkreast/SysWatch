@@ -18,7 +18,7 @@ public static class SignalCli
                 if (File.Exists(candidate)) return candidate;
             }
         }
-        throw new FileNotFoundException("signal-cli bulunamadı. Ayarlar > Signal'de yolunu seçin.");
+        throw new FileNotFoundException(L.T("signal-cli bulunamadı. Ayarlar > Signal'de yolunu seçin.", "signal-cli not found. Choose its path in Settings > Signal."));
     }
 
     public static ProcessStartInfo StartInfo(SignalConfig s, IEnumerable<string> args)
@@ -47,7 +47,7 @@ public static class SignalCli
         if (s.NoteToSelf) args.Add("--note-to-self");
         else args.Add(s.Recipient);
 
-        using var proc = Process.Start(StartInfo(s, args)) ?? throw new InvalidOperationException("signal-cli başlatılamadı.");
+        using var proc = Process.Start(StartInfo(s, args)) ?? throw new InvalidOperationException(L.T("signal-cli başlatılamadı.", "Couldn't start signal-cli."));
         JobObject.Add(proc);
         await proc.StandardInput.WriteAsync(text).ConfigureAwait(false);
         proc.StandardInput.Close();
@@ -63,12 +63,12 @@ public static class SignalCli
         catch (OperationCanceledException)
         {
             proc.Kill(entireProcessTree: true);
-            throw new TimeoutException("signal-cli 90 sn içinde bitmedi.");
+            throw new TimeoutException(L.T("signal-cli 90 sn içinde bitmedi.", "signal-cli didn't finish within 90 s."));
         }
         if (proc.ExitCode != 0)
         {
             var err = await stderrTask.ConfigureAwait(false);
-            throw new InvalidOperationException($"signal-cli çıkış kodu {proc.ExitCode}: {Last(err)}");
+            throw new InvalidOperationException(L.T($"signal-cli çıkış kodu {proc.ExitCode}: {Last(err)}", $"signal-cli exit code {proc.ExitCode}: {Last(err)}"));
         }
     }
 
@@ -116,7 +116,7 @@ public sealed class SignalCliHost : IDisposable
         Stop();
         var psi = SignalCli.StartInfo(s, ["daemon", $"--http=127.0.0.1:{s.DaemonPort}", "--receive-mode=on-start"]);
         psi.RedirectStandardInput = false;
-        _proc = Process.Start(psi) ?? throw new InvalidOperationException("signal-cli daemon başlatılamadı.");
+        _proc = Process.Start(psi) ?? throw new InvalidOperationException(L.T("signal-cli daemon başlatılamadı.", "Couldn't start the signal-cli daemon."));
         JobObject.Add(_proc);
         _proc.ErrorDataReceived += (_, e) =>
         {
@@ -125,7 +125,7 @@ public sealed class SignalCliHost : IDisposable
         };
         _proc.BeginOutputReadLine();
         _proc.BeginErrorReadLine();
-        Log.Info("signal-cli daemon başlatıldı.");
+        Log.Info(L.T("signal-cli daemon başlatıldı.", "signal-cli daemon started."));
     }
 
     public void Stop()
@@ -137,7 +137,7 @@ public sealed class SignalCliHost : IDisposable
         }
         catch (Exception ex)
         {
-            Log.Warn($"signal-cli durdurulamadı: {ex.Message}");
+            Log.Warn(L.T($"signal-cli durdurulamadı: {ex.Message}", $"Couldn't stop signal-cli: {ex.Message}"));
         }
         _proc.Dispose();
         _proc = null;

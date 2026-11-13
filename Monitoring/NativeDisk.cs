@@ -50,7 +50,7 @@ public sealed class NativeDisk : IDisposable
             }
             _drives.Add(drive);
         }
-        Log.Info("Yerel disk sıcaklığı: " + (_drives.Count == 0 ? "desteklenen disk yok" : string.Join(", ", _drives.Select(d => d.Name))));
+        Log.Info(L.T("Yerel disk sıcaklığı: ", "Native disk temperature: ") + (_drives.Count == 0 ? L.T("desteklenen disk yok", "no supported disk") : string.Join(", ", _drives.Select(d => d.Name))));
     }
 
     public List<Reading> Read() => _drives.Select(d => new Reading(d.Name, QueryTemperature(d))).ToList();

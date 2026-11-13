@@ -75,7 +75,7 @@ public sealed class AlertLog(string path)
             }
             catch (IOException ex)
             {
-                Log.Warn($"Geçmiş dosyasına yazılamadı: {ex.Message}");
+                Log.Warn(L.T($"Geçmiş dosyasına yazılamadı: {ex.Message}", $"Couldn't write the history file: {ex.Message}"));
             }
         }
         Added?.Invoke(entry);
@@ -100,7 +100,7 @@ public sealed class AlertLog(string path)
             }
             catch (IOException ex)
             {
-                Log.Warn($"Geçmiş dosyası okunamadı: {ex.Message}");
+                Log.Warn(L.T($"Geçmiş dosyası okunamadı: {ex.Message}", $"Couldn't read the history file: {ex.Message}"));
             }
             if (list.Count == 0) list.AddRange(_recent.Reverse());
             list.Reverse();
@@ -119,7 +119,7 @@ public sealed class AlertLog(string path)
             }
             catch (IOException ex)
             {
-                Log.Warn($"Geçmiş silinemedi: {ex.Message}");
+                Log.Warn(L.T($"Geçmiş silinemedi: {ex.Message}", $"Couldn't delete the history: {ex.Message}"));
             }
         }
     }

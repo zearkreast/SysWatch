@@ -47,7 +47,7 @@ public sealed class NotifierHub(IReadOnlyList<INotifier> notifiers)
         }
         catch (Exception ex)
         {
-            Log.Error($"{notifier.Name} gönderimi başarısız", ex);
+            Log.Error(L.T($"{notifier.Name} gönderimi başarısız", $"{notifier.Name} delivery failed"), ex);
             _lastResult[notifier.Name] = (DateTime.Now, ex.Message);
             return ex.Message;
         }

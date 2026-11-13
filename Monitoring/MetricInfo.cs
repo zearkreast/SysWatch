@@ -17,12 +17,12 @@ public static class MetricInfo
 
     public static string Label(Metric m) => m switch
     {
-        Metric.CpuTemp => "CPU sıcaklığı",
-        Metric.GpuTemp => "GPU sıcaklığı",
-        Metric.CpuLoad => "CPU kullanımı",
-        Metric.GpuLoad => "GPU kullanımı",
-        Metric.Ram => "RAM kullanımı",
-        Metric.DiskTemp => "Disk sıcaklığı",
+        Metric.CpuTemp => L.T("CPU sıcaklığı", "CPU temperature"),
+        Metric.GpuTemp => L.T("GPU sıcaklığı", "GPU temperature"),
+        Metric.CpuLoad => L.T("CPU kullanımı", "CPU usage"),
+        Metric.GpuLoad => L.T("GPU kullanımı", "GPU usage"),
+        Metric.Ram => L.T("RAM kullanımı", "RAM usage"),
+        Metric.DiskTemp => L.T("Disk sıcaklığı", "Disk temperature"),
         _ => m.ToString(),
     };
 

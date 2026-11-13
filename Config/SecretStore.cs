@@ -25,7 +25,7 @@ public static class SecretStore
         }
         catch (Exception ex) when (ex is CryptographicException or FormatException)
         {
-            Log.Warn("Şifreli bir ayar çözülemedi (başka kullanıcı/bilgisayardan kopyalanmış olabilir), boş bırakıldı.");
+            Log.Warn(L.T("Şifreli bir ayar çözülemedi (başka kullanıcı/bilgisayardan kopyalanmış olabilir), boş bırakıldı.", "An encrypted setting couldn't be decrypted (it may have been copied from another user or PC) and was left empty."));
             return "";
         }
     }

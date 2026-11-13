@@ -142,7 +142,7 @@ internal sealed class MetricCard : Control
             var valid = Series.Where(v => !double.IsNaN(v)).ToArray();
             if (valid.Length > 1 && Unit.Length > 0 && Width > Font.Height * 15)
             {
-                var range = $"en düşük {valid.Min():0}{Unit} · en yüksek {valid.Max():0}{Unit}";
+                var range = L.T($"en düşük {valid.Min():0}{Unit} · en yüksek {valid.Max():0}{Unit}", $"low {valid.Min():0}{Unit} · high {valid.Max():0}{Unit}");
                 TextRenderer.DrawText(g, range, _small, new Rectangle(pad, Height - pad - _small.Height + 4, Width - pad * 2, _small.Height), muted,
                     TextFormatFlags.Right | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
             }
@@ -307,7 +307,7 @@ internal sealed class NavList : Control
     {
         if (row == _tipRow) return;
         _tipRow = row;
-        var text = row == -2 ? (Collapsed ? "Menüyü genişlet" : "Menüyü daralt") : Collapsed && row >= 0 ? _rows[row].Text : null;
+        var text = row == -2 ? (Collapsed ? L.T("Menüyü genişlet", "Expand menu") : L.T("Menüyü daralt", "Collapse menu")) : Collapsed && row >= 0 ? _rows[row].Text : null;
         _tip.SetToolTip(this, text);
     }
 

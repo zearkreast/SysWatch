@@ -1,204 +1,184 @@
-﻿<p align="center">
-  <img src="docs/logo.png" width="112" alt="SysWatch logosu">
-</p>
-
-<h1 align="center">SysWatch</h1>
-
 <p align="center">
-  Bilgisayarınız ısınınca ya da zorlanınca haber veren hafif bir Windows tepsi uygulaması.<br>
-  <sub>A lightweight Windows tray app that alerts you when your PC runs hot or under heavy load. · <a href="#english">English below</a></sub>
+  <img src="docs/social-preview.png" alt="SysWatch: a lightweight tray app that alerts you when your PC runs hot or under heavy load">
 </p>
 
 <p align="center">
-  <a href="https://github.com/zearkreast/SysWatch/releases/latest"><img alt="Son sürüm" src="https://img.shields.io/github/v/release/zearkreast/SysWatch?style=flat-square&label=s%C3%BCr%C3%BCm&color=1E88E5"></a>
-  <a href="https://github.com/zearkreast/SysWatch/releases"><img alt="İndirme" src="https://img.shields.io/github/downloads/zearkreast/SysWatch/total?style=flat-square&label=indirme&color=43A047"></a>
+  <b>English</b> · <a href="README.tr.md">Türkçe</a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/zearkreast/SysWatch/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/zearkreast/SysWatch?style=flat-square&color=1E88E5"></a>
+  <a href="https://github.com/zearkreast/SysWatch/releases"><img alt="Downloads" src="https://img.shields.io/github/downloads/zearkreast/SysWatch/total?style=flat-square&color=43A047"></a>
   <img alt="Windows 10/11" src="https://img.shields.io/badge/Windows-10%20%2F%2011-0078D4?style=flat-square&logo=windows&logoColor=white">
   <img alt=".NET 8" src="https://img.shields.io/badge/.NET-8-512BD4?style=flat-square&logo=dotnet&logoColor=white">
-  <a href="LICENSE"><img alt="Lisans: GPL-3.0" src="https://img.shields.io/badge/lisans-GPL--3.0-F9A825?style=flat-square"></a>
+  <a href="LICENSE"><img alt="License: GPL-3.0" src="https://img.shields.io/badge/license-GPL--3.0-F9A825?style=flat-square"></a>
 </p>
 
 <p align="center">
-  <a href="https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-setup.exe"><img alt="Kurulum dosyasını indir" src="https://img.shields.io/badge/Kurulum-%C4%B0ndir-0078D4?style=for-the-badge&logo=windows&logoColor=white"></a>
-  <a href="https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-portable.zip"><img alt="Taşınabilir sürümü indir" src="https://img.shields.io/badge/Ta%C5%9F%C4%B1nabilir-%C4%B0ndir-5C6BC0?style=for-the-badge&logo=files&logoColor=white"></a>
+  <a href="https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-setup.exe"><img alt="Download the installer" src="https://img.shields.io/badge/Installer-Download-0078D4?style=for-the-badge&logo=windows&logoColor=white"></a>
+  <a href="https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-portable.zip"><img alt="Download the portable build" src="https://img.shields.io/badge/Portable-Download-5C6BC0?style=for-the-badge&logo=files&logoColor=white"></a>
 </p>
+
+SysWatch tells you when CPU or GPU temperature, or CPU, GPU or RAM usage, stays above a threshold you set. Alerts can come from Windows itself, Telegram, Discord, e-mail (optionally PGP-encrypted) or Signal. When you're away, you can ask for the status from Telegram, Discord or Signal, close a program that hangs, or shut the PC down.
+
+## Features
+
+- **Lightweight:** about 15 MB of memory and practically no CPU at idle. GPU, disk and RAM are read straight from Windows, without loading heavy vendor libraries.
+- **Editable thresholds:** for each reading, the limit, how long it must be exceeded, how often to remind you, and how far it must drop to count as back to normal.
+- **Five notification channels:** Windows notifications, Telegram, Discord (webhook or bot), e-mail (with optional PGP/MIME encryption) and end-to-end encrypted Signal.
+- **Remote commands:** `/status`, `/top`, `/kill`, `/shutdown`, `/set`, `/mute`, optionally protected by a PIN.
+- **Privacy:** no telemetry. Tokens and passwords are stored encrypted with Windows DPAPI. In minimal mode, no values or computer name leave the PC.
+- **Frutiger Aero interface:** a blurred glass title bar, glossy cards and charts of the last few minutes. Light theme by default, dark theme one click away, and a reduced-motion option.
+- **Tray numbers:** chosen readings can sit in the tray as their own numbers.
+- **English and Turkish:** the interface follows the Windows display language (Turkish if Windows is in Turkish, English otherwise). Change it under Settings > Appearance > Language.
 
 <p align="center">
-  <img src="docs/screens/light.png" width="860" alt="SysWatch ana penceresi ve sağ tık paneli, açık tema">
+  <img src="docs/screens/dark-en.png" width="760" alt="SysWatch in the dark theme">
 </p>
 
-CPU veya GPU sıcaklığı, işlemci, ekran kartı ya da RAM kullanımı belirlediğiniz eşiği belirli bir süre aşınca SysWatch size haber verir. Bildirim Windows'un kendisinden, Telegram'dan, Discord'dan, e-postadan (isteğe bağlı PGP ile) ya da Signal'den gelebilir. Evde değilken Telegram, Discord veya Signal'den durumu sorabilir, takılan bir programı kapatabilir ya da bilgisayarı kapatabilirsiniz.
+## Download and install
 
-## Özellikler
-
-- **Hafif:** Boşta yaklaşık 15 MB bellek ve neredeyse sıfır işlemci. GPU, disk ve RAM değerleri ağır sürücü kütüphaneleri yüklenmeden doğrudan Windows'tan okunur.
-- **Düzenlenebilir eşikler:** Her ölçüm için eşik, ne kadar süre aşılması gerektiği, hatırlatma aralığı ve "normale döndü" payı.
-- **Beş bildirim kanalı:** Windows bildirimi, Telegram, Discord (webhook ya da bot), e-posta (PGP/MIME şifreleme seçeneğiyle) ve uçtan uca şifreli Signal.
-- **Uzaktan komutlar:** `/status`, `/top`, `/kill`, `/shutdown`, `/set`, `/mute`. İsterseniz PIN ile korunur.
-- **Gizlilik:** Telemetri yok. Tokenlar ve parolalar Windows DPAPI ile şifreli saklanır. "Az bilgi" modunda kanala değer ya da bilgisayar adı gitmez.
-- **Frutiger Aero arayüz:** Bulanık cam başlık, parlak kartlar, son birkaç dakikanın grafikleri. Açık tema varsayılan, koyu tema bir tık uzakta. "Hareketleri azalt" seçeneği var.
-- **Tepside sayılar:** İsterseniz seçtiğiniz okumalar tepside ayrı birer sayı olarak durur.
-
-<p align="center">
-  <img src="docs/screens/dark.png" width="760" alt="SysWatch koyu tema">
-</p>
-
-## İndirme ve kurulum
-
-| Hangisi? | Dosya |
+| Which one? | File |
 | --- | --- |
-| **Çoğu kişi için:** kurulum dosyası. Başlat menüsüne ekler, isterseniz Windows açılınca başlatır, eksikse .NET 8'i kendisi kurar. | [`SysWatch_x64-setup.exe`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-setup.exe) |
-| **Taşınabilir:** kurulum yok. Klasöre açıp çalıştırın, ayarlar klasörün içindeki `data`'da durur. [.NET 8 Masaüstü Çalışma Zamanı](https://dotnet.microsoft.com/download/dotnet/8.0) gerekir. | [`SysWatch_x64-portable.zip`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-portable.zip) |
+| **For most people:** the installer. Adds a Start menu entry, can start SysWatch with Windows, and installs .NET 8 itself if it's missing. | [`SysWatch_x64-setup.exe`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-setup.exe) |
+| **Portable:** nothing to install. Unzip and run; settings stay in the `data` folder inside. Needs the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0). | [`SysWatch_x64-portable.zip`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-portable.zip) |
 
-1. Kurulum dosyasını indirip açın.
-2. Mavi bir "Windows bilgisayarınızı korudu" penceresi çıkarsa **Ek bilgi**'ye, sonra **Yine de çalıştır**'a basın. Dosya kod imzalı olmadığı için bu uyarı çıkar.
-3. Kurulum bitince SysWatch tepsiye yerleşir. Sol tık ana pencereyi, sağ tık küçük özet panelini açar.
+1. Download and open the installer.
+2. If a blue "Windows protected your PC" window appears, click **More info**, then **Run anyway**. The file isn't code-signed, which is why the warning appears.
+3. When setup finishes, SysWatch sits in the tray. Left-click opens the main window, right-click a small summary panel.
 
-**Gereksinimler:** Windows 10 veya 11 (64 bit). SysWatch sensörlere erişmek ve uzaktan komutları çalıştırmak için yönetici izniyle çalışır. "Windows açılınca başlat" seçeneği bunu her açılışta UAC sormadan yapar.
+**Requirements:** Windows 10 or 11 (64-bit). SysWatch runs with administrator rights to read sensors and carry out remote commands. The "start with Windows" option does this without a UAC prompt at every sign-in.
 
-**CPU sıcaklığı için PawnIO:** İşlemci sıcaklığını okumak için ücretsiz [PawnIO](https://pawnio.eu/) sürücüsü gerekir. Kurulu değilse CPU sıcaklığı "okunamıyor" görünür, diğer her şey çalışır.
+**PawnIO for CPU temperature:** reading the processor temperature needs the free [PawnIO](https://pawnio.eu/) driver. Without it, CPU temperature shows as unreadable and everything else works.
 
-**Güncelleme:** Yeni kurulum dosyasını aynı şekilde çalıştırın, ayarlarınız kalır. **Kaldırma:** Windows Ayarlar > Uygulamalar'dan. Kaldırıcı ayarlarınızı da silmek isteyip istemediğinizi sorar.
+**Updating:** run the new installer the same way; your settings stay. **Uninstalling:** from Windows Settings > Apps. The uninstaller asks whether to delete your settings too.
 
-## Kullanım
+## Using it
 
-- **Sol tık:** Ana pencere. Sol menüde **İzleme** (Durum, Geçmiş) ve **Ayarlar** (Uyarı eşikleri, Bildirim kanalları, Görünüm, Donanım, Güvenlik, Uygulama) var. Menü ≡ düğmesiyle simgelere daraltılır. Pencere taşınır, boyutlandırılır, ekranı kaplayabilir.
-- **Sağ tık:** Tepsinin hemen üstünde dört canlı kart ve Aç, Geçmiş, Ayarlar, Sustur, Günlük, Çıkış düğmeleri.
-- **Durum > Detaylar:** Açık donanım gruplarının bütün sensörleri. Kapalı gruplar da listelenir, Donanım ayarlarına bağlantıyla.
-- **Geçmiş:** Son 7 günün uyarıları, "normale döndü" kayıtları ve uzaktan gelen komutlar.
-- **Tepsi simgesi:** Uyarı varken köşesinde kırmızı, bildirimler susturulmuşken gri bir nokta çıkar.
+- **Left-click:** the main window. The left menu has **Monitoring** (Status, History) and **Settings** (Alert thresholds, Notification channels, Appearance, Hardware, Security, App). The ≡ button collapses it to icons. The window can be moved, resized and maximized.
+- **Right-click:** four live cards and Open, History, Settings, Mute, Log and Exit buttons, right above the tray.
+- **Status > Details:** every sensor of the enabled hardware groups. Groups that are switched off are listed too, with a link to the Hardware settings.
+- **History:** alerts, back-to-normal events and remote commands from the last 7 days.
+- **Tray icon:** a red dot in the corner while an alert is active, a gray one while notifications are muted.
 
-Ayarlar, geçmiş ve günlük `%APPDATA%\SysWatch\` klasöründe durur (taşınabilir sürümde exe'nin yanındaki `data` klasöründe). Ayarlar > Uygulama'daki bağlantı klasörü açar.
+Settings, history and the log live in `%APPDATA%\SysWatch\` (in the `data` folder next to the exe for the portable build). The link under Settings > App opens the folder.
 
-## Eşikler
+## Thresholds
 
-| Metrik | Varsayılan | Not |
+| Metric | Default | Note |
 |---|---|---|
-| `cpu_temp` | 85°C | PawnIO gerekir |
-| `gpu_temp` | 83°C | Birden fazla GPU varsa en yüksek değer |
-| `cpu_load` | %90 | |
-| `gpu_load` | %95 | |
-| `ram` | %90 | |
-| `disk_temp` | 70°C | NVMe diskler yük altında 60-70°C'ye çıkabilir |
+| `cpu_temp` | 85°C | Needs PawnIO |
+| `gpu_temp` | 83°C | With several GPUs, the highest value |
+| `cpu_load` | 90% | |
+| `gpu_load` | 95% | |
+| `ram` | 90% | |
+| `disk_temp` | 70°C | NVMe drives can reach 60-70°C under load |
 
-- **Süre:** Değer bu kadar saniye eşiğin üstünde kalırsa uyarı verilir. Kısa sıçramalar uyarı tetiklemez.
-- **Tekrar:** Sorun sürerse kaç dakikada bir hatırlatılacağı.
-- **Histerezis:** "Normale döndü" bildirimi için değerin eşiğin bu kadar altına inmesi gerekir.
+- **Duration:** alert only when the value stays above the threshold for this many seconds, so short spikes don't trigger anything.
+- **Repeat:** how often, in minutes, to remind you while the problem lasts.
+- **Hysteresis:** how far below the threshold the value must drop before "back to normal" is sent.
 
-## Bildirim kanallarını kurma
+## Setting up notification channels
 
-Hepsi Ayarlar > **Bildirim kanalları** sayfasından yapılır. Her kanalın sayfasında bir **Test bildirimi gönder** düğmesi vardır.
+Everything is under Settings > **Notification channels**. Each channel's page has a **Send test notification** button.
 
 <details>
 <summary><b>Telegram</b></summary>
 
-1. Telegram'da @BotFather'a `/newbot` yazın ve verilen token'ı alın.
-2. Kendi botunuza özel mesajla `/start` yazın.
-3. SysWatch'ta token'ı girin ve **Chat ID bul**'a basın.
-4. Mod olarak "Sadece bildirim" ya da "Bildirim + komut" seçin.
+1. In Telegram, send `/newbot` to @BotFather and copy the token it gives you.
+2. Send `/start` to your own bot in a private chat.
+3. Enter the token in SysWatch and click **Find chat ID**.
+4. Choose "Notifications only" or "Notifications + commands" as the mode.
 
-Komutlar yalnızca bu özel sohbetten kabul edilir.
+Commands are accepted only from that private chat.
 </details>
 
 <details>
 <summary><b>Discord</b></summary>
 
-- **Webhook (sadece bildirim, bot gerekmez):** Kanal ayarları > Entegrasyonlar > Webhook oluşturun, URL'yi yapıştırın.
-- **Bot (bildirim + slash komutları, sunucu gerekmez):**
-  1. https://discord.com/developers/applications adresinde bir uygulama ve bot oluşturun, token'ı alın.
-  2. **Installation** sekmesinde "User Install" kutusunu işaretleyin.
-  3. SysWatch'ta **Hesabıma ekle**'ye basıp botu hesabınıza ekleyin. Bot size DM'den yazar, ortak sunucu gerekmez.
-  4. **İzinli kullanıcı ID**'ye kendi ID'nizi yazın (Discord > Gelişmiş > Geliştirici Modu, sonra adınıza sağ tık > Kullanıcı ID'sini Kopyala).
-  5. Kaydedin. Botla DM'de `/` yazınca SysWatch komutları çıkar, cevapları yalnızca siz görürsünüz.
+- **Webhook (notifications only, no bot):** Channel settings > Integrations > Webhooks, create one and paste its URL.
+- **Bot (notifications + slash commands, no server needed):**
+  1. Create an application and a bot at https://discord.com/developers/applications and copy the token.
+  2. On the **Installation** tab, tick "User Install".
+  3. Click **Add to my account** in SysWatch and add the bot to your account. It can then DM you without a shared server.
+  4. Enter your own ID as the **Allowed user ID** (Discord > Advanced > Developer Mode, then right-click your name > Copy User ID).
+  5. Save. Typing `/` in the bot's DM lists the SysWatch commands, and only you see the replies.
 
-  Bildirimler bir sunucu kanalına gitsin isterseniz **Sunucuma ekle** ile botu ekleyip Kanal ID'yi girin. Message Content Intent gerekmez.
+  To send notifications to a server channel instead, add the bot with **Add to my server** and enter the channel ID. The Message Content intent is not needed.
 </details>
 
 <details>
-<summary><b>E-posta (isteğe bağlı PGP)</b></summary>
+<summary><b>E-mail (optional PGP)</b></summary>
 
-SMTP bilgilerini girin. Gmail için `smtp.gmail.com`, port 587 ve bir **uygulama şifresi** gerekir.
+Enter your SMTP details. For Gmail, use `smtp.gmail.com`, port 587 and an **app password**.
 
-Kendi PGP açık anahtarınızı (.asc) seçerseniz mail PGP/MIME ile şifrelenir. Açmak için PGP destekli bir istemci gerekir: Thunderbird, Proton Mail ya da Android'de FairEmail + OpenKeychain.
+If you choose your own PGP public key (.asc), messages are encrypted with PGP/MIME. You need a PGP-capable client to read them, such as Thunderbird, Proton Mail, or FairEmail + OpenKeychain on Android.
 </details>
 
 <details>
-<summary><b>Signal (uçtan uca şifreli)</b></summary>
+<summary><b>Signal (end-to-end encrypted)</b></summary>
 
-1. [signal-cli](https://github.com/AsamK/signal-cli/releases)'yi indirip bir klasöre açın (Java 21+ gerekir).
-2. Hesabı kurun:
-   - **Kendi hesabınıza bağlı cihaz (ek numara gerekmez):** `signal-cli link -n SysWatch` komutunun verdiği bağlantıyı QR koda çevirip telefonda Signal > Ayarlar > Bağlı cihazlar'dan okutun. "Kendime Not"u işaretleyin, hesap numarasına kendi numaranızı yazın.
-   - **Ayrı numara:** `signal-cli -a +90... register`, ardından `verify KOD`. Hesap numarası botun, alıcı numara sizin numaranızdır.
-3. SysWatch'ta `signal-cli.bat` dosyasının yolunu seçin.
+1. Download [signal-cli](https://github.com/AsamK/signal-cli/releases) and unpack it to a folder (it needs Java 21+).
+2. Set up the account in one of two ways:
+   - **As a device linked to your own account (no extra number):** turn the link printed by `signal-cli link -n SysWatch` into a QR code and scan it on your phone under Signal > Settings > Linked devices. Tick "Note to Self" and enter your own number as the account number.
+   - **With a separate number:** `signal-cli -a +1... register`, then `verify CODE`. The account number is the bot's, the recipient number is yours.
+3. Choose the path to `signal-cli.bat` in SysWatch.
 
-"Sadece bildirim" modunda boşta hiçbir yük yoktur. "Bildirim + komut" modunda signal-cli sürekli çalışır ve 150-250 MB RAM kullanır.
+In "Notifications only" mode nothing runs while idle. In "Notifications + commands" mode signal-cli keeps running and uses 150-250 MB of RAM.
 </details>
 
-## Uzaktan komutlar
+## Remote commands
 
-| Komut | Ne yapar |
+| Command | What it does |
 |---|---|
-| `/status` | Anlık değerler |
-| `/top` | En çok CPU/RAM kullanan 5 işlem |
-| `/kill <ad\|pid> [PIN]` | İşlemi sonlandırır. Sistem işlemleri korunur. |
-| `/shutdown [dakika] [PIN]` | Kapatma ister; `/confirm` ile onaylanır, `/cancel` ile iptal edilir |
-| `/thresholds` | Eşikleri gösterir |
-| `/set <metrik> <değer\|on\|off>` | Eşik değiştirir, ör. `/set cpu_temp 80` |
-| `/mute <dakika>`, `/unmute` | Bildirimleri susturur / açar |
+| `/status` | Current readings |
+| `/top` | The 5 processes using the most CPU/RAM |
+| `/kill <name\|pid> [PIN]` | Ends a process. System processes are protected. |
+| `/shutdown [minutes] [PIN]` | Asks to shut down; confirm with `/confirm`, cancel with `/cancel` |
+| `/thresholds` | Shows the thresholds |
+| `/set <metric> <value\|on\|off>` | Changes a threshold, e.g. `/set cpu_temp 80` |
+| `/mute <minutes>`, `/unmute` | Mutes / unmutes notifications |
 
-- PIN açıksa `/kill` ve `/shutdown` komutlarında PIN son argüman olarak yazılır. 5 hatalı denemeden sonra bu komutlar 15 dakika kilitlenir.
-- Bilgisayar kapalıyken gönderilen ya da 2 dakikadan eski komutlar çalıştırılmaz.
+- With a PIN set, `/kill` and `/shutdown` take the PIN as their last argument. After 5 wrong attempts these commands are locked for 15 minutes.
+- Commands sent while the PC was off, or older than 2 minutes, are not carried out.
+- Replies are in the app's language. Discord shows the slash command descriptions in English or Turkish, depending on your Discord language.
 
-## Gizlilik
+## Privacy
 
-| Kanal | Uçtan uca şifreli mi | İçeriği sizin dışınızda görebilenler |
+| Channel | End-to-end encrypted? | Who else can read it |
 |---|---|---|
-| Windows bildirimi | Bilgisayardan çıkmaz | |
-| Telegram | Hayır (botlar gizli sohbet kullanamaz) | Telegram |
-| Discord | Hayır | Discord, kanalı görebilen üyeler, webhook URL'sine sahip olan biri |
-| E-posta | Hayır | Mail sağlayıcıları |
-| E-posta + PGP | Evet (gövde) | Konu satırı görünür; bu yüzden genel tutulur: "SysWatch bildirimi" |
-| Signal | Evet | |
+| Windows notification | Never leaves the PC | |
+| Telegram | No (bots can't use secret chats) | Telegram |
+| Discord | No | Discord, members who can see the channel, anyone with the webhook URL |
+| E-mail | No | The mail providers |
+| E-mail + PGP | Yes (the body) | The subject line is visible, so it stays generic: "SysWatch notification" |
+| Signal | Yes | |
 
-- **Az bilgi modu:** Kanala yalnızca hangi okumanın uyarı verdiği gider ("CPU sıcaklığı uyarısı var"). Değer, işlem adı ve bilgisayar adı gitmez. Telegram ve Discord'da varsayılan olarak açık.
-- Token, şifre, webhook URL'si ve PIN, `config.json` içinde Windows DPAPI ile şifreli saklanır; dosya başka bir kullanıcıya veya bilgisayara kopyalanırsa çözülemez.
-- Telemetri yok. Veri yalnızca sizin ayarladığınız servislere gider.
-- Komutlar yalnızca izinli sohbet, kullanıcı ID'si veya numaradan kabul edilir. Mesajlaşma hesabınızda 2FA açın ve PIN kullanın.
+- **Minimal mode:** the channel only learns which reading raised the alert ("CPU temperature alert"). No values, process names or computer name are sent. On by default for Telegram and Discord.
+- Tokens, passwords, the webhook URL and the PIN are stored in `config.json` encrypted with Windows DPAPI; copied to another user or PC, they can't be decrypted.
+- No telemetry. Data only goes to the services you set up.
+- Commands are accepted only from the allowed chat, user ID or number. Turn on 2FA for your messaging accounts and use a PIN.
 
-## Kaynak kullanımı
+## Resource use
 
-Ağır kütüphaneler yüklenmesin diye GPU sıcaklığı ve kullanımı (Görev Yöneticisi'nin kullandığı D3DKMT arayüzü), disk sıcaklığı (NVMe sağlık kaydı) ve RAM doğrudan Windows'tan okunur. CPU, [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) ile okunur. Ayarlar > Donanım'daki "GPU ayrıntılı" ve "Disk ayrıntılı" seçenekleri daha çok sensör gösterir (GPU hot spot, SMART değerleri gibi) ama her biri yaklaşık 40 MB daha fazla bellek kullanır. Pencere yalnızca açıkken bellekte durur.
+To keep heavy libraries out, GPU temperature and usage (through D3DKMT, the interface Task Manager uses), disk temperature (the NVMe health log) and RAM are read straight from Windows. The CPU is read with [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor). The "GPU detailed" and "Disk detailed" options under Settings > Hardware show more sensors (GPU hot spot, SMART values and so on) but each costs about 40 MB more memory. The window only takes memory while it's open.
 
-## Kaynaktan derleme
+## Building from source
 
-[.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) gerekir.
+Needs the [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0).
 
 ```powershell
 dotnet build -c Release
 ```
 
-Yayın dosyaları (kurulum ve taşınabilir zip) `dist\` klasörüne çıkar. Kurulum dosyası için [Inno Setup 6](https://jrsoftware.org/isinfo.php) gerekir; yoksa sadece taşınabilir zip üretilir.
+The release files (installer and portable zip) go to `dist\`. The installer needs [Inno Setup 6](https://jrsoftware.org/isinfo.php); without it, only the portable zip is built.
 
 ```powershell
 .\scripts\build-release.ps1
 ```
 
-Sürümler GitHub Actions'taki **Release** iş akışıyla yayınlanır (Actions > Release > Run workflow). Sürüm numarası `SysWatch.csproj` içindeki `<Version>`'dan, sürüm notları `docs/releases/<sürüm>.md`'den okunur.
+Releases are published by the **Release** workflow in GitHub Actions (Actions > Release > Run workflow). It takes the version from `<Version>` in `SysWatch.csproj` and the release notes from `docs/releases/<version>.md`.
 
-## Lisans
+## License
 
-SysWatch, [GNU General Public License v3.0](LICENSE) ile lisanslı özgür yazılımdır. Kullandığı kütüphaneler ve görseller kendi lisanslarıyla gelir; ayrıntılar [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) ve [`licenses/`](licenses) klasöründe. Discord, Telegram ve Signal logoları sahiplerinin ticari markalarıdır ve yalnızca ilgili kanalı göstermek için kullanılır.
-
----
-
-<a id="english"></a>
-<details>
-<summary><b>English</b></summary>
-
-SysWatch is a lightweight Windows tray app (about 15 MB of memory at idle) that warns you when CPU or GPU temperature, CPU, GPU or RAM usage stays above a threshold you choose. Alerts go to Windows notifications, Telegram, Discord (webhook or bot), e-mail (optionally PGP-encrypted) or end-to-end encrypted Signal. From Telegram, Discord or Signal you can also ask for the status, list the top processes, kill a process or shut the PC down, optionally behind a PIN. There is no telemetry; secrets are stored encrypted with Windows DPAPI.
-
-**Download:** [`SysWatch_x64-setup.exe`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-setup.exe) (installer; installs the .NET 8 Desktop Runtime if needed) or [`SysWatch_x64-portable.zip`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-portable.zip) (no install, settings stay in its `data` folder; needs the .NET 8 Desktop Runtime). The files are not code-signed, so SmartScreen may ask you to choose **More info → Run anyway**.
-
-Windows 10/11 x64. SysWatch runs elevated to read sensors and run remote commands. CPU temperature needs the free [PawnIO](https://pawnio.eu/) driver. The interface is in Turkish.
-
-Licensed under the GPL-3.0; third-party components are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
-</details>
+SysWatch is free software under the [GNU General Public License v3.0](LICENSE). The libraries and artwork it uses come under their own licenses; see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) and the [`licenses/`](licenses) folder. The Discord, Telegram and Signal logos are trademarks of their owners and are used only to label the matching channel.

@@ -45,7 +45,7 @@ public sealed class NativeGpu : IDisposable
         }
         catch (Exception ex) when (ex is DllNotFoundException or EntryPointNotFoundException)
         {
-            Log.Warn($"Yerel GPU arayüzü kullanılamıyor: {ex.Message}");
+            Log.Warn(L.T($"Yerel GPU arayüzü kullanılamıyor: {ex.Message}", $"Native GPU interface unavailable: {ex.Message}"));
         }
     }
 
@@ -82,7 +82,7 @@ public sealed class NativeGpu : IDisposable
             adapter.LastRunning = new long[adapter.NodeCount];
             _adapters.Add(adapter);
         }
-        Log.Info("Yerel GPU arayüzü: " + string.Join(", ", _adapters.Select(a => $"{a.Name} ({a.NodeCount} motor)")));
+        Log.Info(L.T("Yerel GPU arayüzü: ", "Native GPU interface: ") + string.Join(", ", _adapters.Select(a => L.T($"{a.Name} ({a.NodeCount} motor)", $"{a.Name} ({a.NodeCount} engines)"))));
     }
 
     public List<Reading> Read()

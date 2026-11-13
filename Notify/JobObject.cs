@@ -16,7 +16,7 @@ internal static class JobObject
         }
         catch (Exception ex)
         {
-            Log.Warn($"Alt süreç iş nesnesine eklenemedi: {ex.Message}");
+            Log.Warn(L.T($"Alt süreç iş nesnesine eklenemedi: {ex.Message}", $"Couldn't add a child process to the job object: {ex.Message}"));
         }
     }
 

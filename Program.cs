@@ -16,6 +16,8 @@ internal static class Program
         if (args.Length >= 2 && args[0] == "--glass-shot")
         {
             ApplicationConfiguration.Initialize();
+            if (args.Contains("en")) L.Apply(Config.UiLanguage.English);
+            else if (args.Contains("tr")) L.Apply(Config.UiLanguage.Turkish);
             Diagnostics.GlassShot(args[1], args.Contains("dark"));
             return;
         }
@@ -29,26 +31,27 @@ internal static class Program
             }
             catch (Exception ex)
             {
-                Log.Error("Başlangıç görevi", ex);
+                Log.Error(L.T("Başlangıç görevi", "Startup task"), ex);
                 Environment.ExitCode = 1;
             }
             return;
         }
 
+        L.Apply(Config.AppConfig.Load().Language);
         using var mutex = new Mutex(true, @"Global\SysWatch.Instance", out var first);
         if (!first)
         {
-            MessageBox.Show("SysWatch zaten çalışıyor (sistem tepsisine bakın).", "SysWatch",
+            MessageBox.Show(L.T("SysWatch zaten çalışıyor (sistem tepsisine bakın).", "SysWatch is already running (look in the system tray)."), "SysWatch",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);
-        Application.ThreadException += (_, e) => Log.Error("Arayüz hatası", e.Exception);
-        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Error("Beklenmeyen hata", e.ExceptionObject as Exception);
+        Application.ThreadException += (_, e) => Log.Error(L.T("Arayüz hatası", "UI error"), e.Exception);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Log.Error(L.T("Beklenmeyen hata", "Unexpected error"), e.ExceptionObject as Exception);
         TaskScheduler.UnobservedTaskException += (_, e) =>
         {
-            Log.Error("Gözlenmeyen görev hatası", e.Exception);
+            Log.Error(L.T("Gözlenmeyen görev hatası", "Unobserved task error"), e.Exception);
             e.SetObserved();
         };
 

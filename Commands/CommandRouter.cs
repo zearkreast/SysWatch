@@ -40,8 +40,8 @@ public sealed class CommandRouter(IAppContext app)
         var at = cmd.IndexOf('@'); // Telegram appends @BotName in groups
         if (at > 0) cmd = cmd[..at];
         var args = parts.Skip(1).ToArray();
-        Log.Info($"Komut ({channel}): {cmd}");
-        if (channel != "Yerel") app.Events.Add(EventKind.Command, $"Komut ({channel}): {cmd}");
+        Log.Info(L.T($"Komut ({channel}): {cmd}", $"Command ({channel}): {cmd}"));
+        if (channel != "Yerel") app.Events.Add(EventKind.Command, L.T($"Komut ({channel}): {cmd}", $"Command ({channel}): {cmd}"));
 
         try
         {
@@ -58,17 +58,17 @@ public sealed class CommandRouter(IAppContext app)
                 "/set" => Set(args),
                 "/mute" => Mute(args),
                 "/unmute" => Unmute(),
-                _ => "Bilinmeyen komut. /help yazın.",
+                _ => L.T("Bilinmeyen komut. /help yazın.", "Unknown command. Type /help."),
             };
         }
         catch (Exception ex)
         {
-            Log.Error($"Komut hatası ({cmd})", ex);
-            return "Komut çalıştırılırken hata oluştu: " + ex.Message;
+            Log.Error(L.T($"Komut hatası ({cmd})", $"Command error ({cmd})"), ex);
+            return L.T("Komut çalıştırılırken hata oluştu: ", "The command failed: ") + ex.Message;
         }
     }
 
-    private static string Help() =>
+    private static string Help() => L.T(
         """
         SysWatch komutları:
         /status: anlık durum
@@ -80,34 +80,46 @@ public sealed class CommandRouter(IAppContext app)
         /set <metrik> <değer|on|off>: eşik değiştirir (ör. /set cpu_temp 80)
         /mute <dakika> · /unmute: bildirimleri susturur / açar
         Metrikler: cpu_temp, gpu_temp, cpu_load, gpu_load, ram, disk_temp
-        """;
+        """,
+        """
+        SysWatch commands:
+        /status: current readings
+        /top: processes using the most resources
+        /kill <name|pid> [PIN]: ends a process
+        /shutdown [minutes] [PIN]: shuts the PC down (asks for confirmation)
+        /confirm: confirms the shutdown · /cancel: cancels it
+        /thresholds: shows the thresholds
+        /set <metric> <value|on|off>: changes a threshold (e.g. /set cpu_temp 80)
+        /mute <minutes> · /unmute: mutes / unmutes notifications
+        Metrics: cpu_temp, gpu_temp, cpu_load, gpu_load, ram, disk_temp
+        """);
 
     private static string MinimalRefusal() =>
-        "Bu kanal az bilgi modunda, ayrıntı gönderilmiyor. Signal veya PGP'li e-posta kullanın ya da az bilgi modunu kapatın.";
+        L.T("Bu kanal az bilgi modunda, ayrıntı gönderilmiyor. Signal veya PGP'li e-posta kullanın ya da az bilgi modunu kapatın.", "This channel is in minimal mode, so no details are sent. Use Signal or PGP e-mail, or turn minimal mode off.");
 
     private string Status(bool minimal)
     {
         var active = app.ActiveAlerts;
-        var muted = app.Hub.Muted ? $" · Bildirimler {app.Hub.MutedUntil:HH:mm}'e kadar susturuldu" : "";
+        var muted = app.Hub.Muted ? L.T($" · Bildirimler {app.Hub.MutedUntil:HH:mm}'e kadar susturuldu", $" · Notifications muted until {app.Hub.MutedUntil:HH:mm}") : "";
         if (minimal)
-            return (active.Count == 0 ? "Durum: normal." : $"Durum: {active.Count} uyarı aktif ({string.Join(", ", active.Select(MetricInfo.Label))}).") + muted;
+            return (active.Count == 0 ? L.T("Durum: normal.", "Status: normal.") : L.T($"Durum: {active.Count} uyarı aktif ({string.Join(", ", active.Select(MetricInfo.Label))}).", $"Status: {active.Count} active alert(s) ({string.Join(", ", active.Select(MetricInfo.Label))}).")) + muted;
 
         var snap = app.LastSnapshot;
-        if (snap == null) return "Henüz ölçüm yok, birkaç saniye sonra tekrar deneyin.";
+        if (snap == null) return L.T("Henüz ölçüm yok, birkaç saniye sonra tekrar deneyin.", "No reading yet, try again in a few seconds.");
         var sb = new StringBuilder();
         if (app.Config.IncludeHostname) sb.AppendLine(Environment.MachineName);
         foreach (var m in Enum.GetValues<Metric>())
         {
             var v = snap.Get(m);
             var flag = active.Contains(m) ? " ⚠" : "";
-            sb.AppendLine($"{MetricInfo.Label(m)}: {(v == null ? "okunamıyor" : MetricInfo.Format(m, v.Value))}{flag}");
+            sb.AppendLine($"{MetricInfo.Label(m)}: {(v == null ? L.T("okunamıyor", "unreadable") : MetricInfo.Format(m, v.Value))}{flag}");
         }
         if (snap.Details.Count > 0)
         {
             sb.AppendLine();
             foreach (var d in snap.Details) sb.AppendLine(d);
         }
-        sb.Append(active.Count == 0 ? "Uyarı yok." : $"{active.Count} uyarı aktif.");
+        sb.Append(active.Count == 0 ? L.T("Uyarı yok.", "No alerts.") : L.T($"{active.Count} uyarı aktif.", $"{active.Count} active alert(s)."));
         sb.Append(muted);
         return sb.ToString();
     }
@@ -157,10 +169,10 @@ public sealed class CommandRouter(IAppContext app)
             }
         }
 
-        var sb = new StringBuilder("En çok CPU:\n");
+        var sb = new StringBuilder(L.T("En çok CPU:\n", "Top CPU:\n"));
         foreach (var r in rows.Where(r => r.Pid != 0).OrderByDescending(r => r.Cpu).Take(5))
-            sb.AppendLine($"  {r.Name} (pid {r.Pid}): %{r.Cpu:0.0}");
-        sb.AppendLine("En çok RAM:");
+            sb.AppendLine($"  {r.Name} (pid {r.Pid}): {L.Percent(r.Cpu, "0.0")}");
+        sb.AppendLine(L.T("En çok RAM:", "Top RAM:"));
         foreach (var r in rows.OrderByDescending(r => r.Mem).Take(5))
             sb.AppendLine($"  {r.Name} (pid {r.Pid}): {r.Mem / 1048576.0:0} MB");
         return sb.ToString().TrimEnd();
@@ -169,7 +181,7 @@ public sealed class CommandRouter(IAppContext app)
     private string Kill(string[] args)
     {
         if (!CheckPin(ref args, out var pinError)) return pinError;
-        if (args.Length != 1) return "Kullanım: /kill <ad|pid>" + (app.Config.Security.PinEnabled ? " <PIN>" : "");
+        if (args.Length != 1) return L.T("Kullanım: /kill <ad|pid>", "Usage: /kill <name|pid>") + (app.Config.Security.PinEnabled ? " <PIN>" : "");
 
         var target = args[0];
         var self = Environment.ProcessId;
@@ -182,14 +194,14 @@ public sealed class CommandRouter(IAppContext app)
             }
             catch (ArgumentException)
             {
-                return $"pid {pid} bulunamadı.";
+                return L.T($"pid {pid} bulunamadı.", $"pid {pid} not found.");
             }
         }
         else
         {
             var name = target.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) ? target[..^4] : target;
             matches = Process.GetProcessesByName(name).ToList();
-            if (matches.Count == 0) return $"\"{name}\" adında çalışan işlem yok.";
+            if (matches.Count == 0) return L.T($"\"{name}\" adında çalışan işlem yok.", $"No running process named \"{name}\".");
         }
 
         var killed = 0;
@@ -215,9 +227,9 @@ public sealed class CommandRouter(IAppContext app)
             }
         }
 
-        var msg = $"{killed} işlem sonlandırıldı.";
-        if (refused.Count > 0) msg += " Korumalı/sonlandırılamayan: " + string.Join(", ", refused.Take(5));
-        Log.Info($"/kill {target}: {killed} sonlandırıldı, {refused.Count} reddedildi");
+        var msg = L.T($"{killed} işlem sonlandırıldı.", $"{killed} process(es) ended.");
+        if (refused.Count > 0) msg += L.T(" Korumalı/sonlandırılamayan: ", " Protected or couldn't be ended: ") + string.Join(", ", refused.Take(5));
+        Log.Info(L.T($"/kill {target}: {killed} sonlandırıldı, {refused.Count} reddedildi", $"/kill {target}: {killed} ended, {refused.Count} refused"));
         return msg;
     }
 
@@ -226,9 +238,9 @@ public sealed class CommandRouter(IAppContext app)
         if (!CheckPin(ref args, out var pinError)) return pinError;
         var minutes = 1;
         if (args.Length > 0 && (!int.TryParse(args[0], out minutes) || minutes < 0 || minutes > 1440))
-            return "Kullanım: /shutdown [dakika 0-1440]";
+            return L.T("Kullanım: /shutdown [dakika 0-1440]", "Usage: /shutdown [minutes 0-1440]");
         lock (_gate) _pendingShutdown = (minutes, DateTime.Now.AddMinutes(2));
-        return $"Bilgisayar {minutes} dakika sonra kapatılacak. Onaylamak için 2 dakika içinde /confirm yazın.";
+        return L.T($"Bilgisayar {minutes} dakika sonra kapatılacak. Onaylamak için 2 dakika içinde /confirm yazın.", $"The PC will shut down in {minutes} minute(s). Send /confirm within 2 minutes to go ahead.");
     }
 
     private string Confirm()
@@ -239,22 +251,22 @@ public sealed class CommandRouter(IAppContext app)
             if (_pendingShutdown == null || _pendingShutdown.Value.Expires < DateTime.Now)
             {
                 _pendingShutdown = null;
-                return "Onay bekleyen bir kapatma yok.";
+                return L.T("Onay bekleyen bir kapatma yok.", "There is no shutdown waiting for confirmation.");
             }
             pending = _pendingShutdown.Value;
             _pendingShutdown = null;
         }
         var seconds = Math.Max(pending.Minutes * 60, 10);
-        RunShutdown("/s", "/t", seconds.ToString(CultureInfo.InvariantCulture), "/c", "SysWatch uzaktan kapatma");
-        Log.Info($"Kapatma planlandı: {seconds} sn");
-        return $"Kapatma planlandı ({seconds} sn). İptal için /cancel.";
+        RunShutdown("/s", "/t", seconds.ToString(CultureInfo.InvariantCulture), "/c", L.T("SysWatch uzaktan kapatma", "SysWatch remote shutdown"));
+        Log.Info(L.T($"Kapatma planlandı: {seconds} sn", $"Shutdown scheduled: {seconds} s"));
+        return L.T($"Kapatma planlandı ({seconds} sn). İptal için /cancel.", $"Shutdown scheduled ({seconds} s). Send /cancel to stop it.");
     }
 
     private string Cancel()
     {
         lock (_gate) _pendingShutdown = null;
         var code = RunShutdown("/a");
-        return code == 0 ? "Planlanmış kapatma iptal edildi." : "İptal edilecek planlanmış kapatma yoktu.";
+        return code == 0 ? L.T("Planlanmış kapatma iptal edildi.", "The scheduled shutdown was cancelled.") : L.T("İptal edilecek planlanmış kapatma yoktu.", "There was no scheduled shutdown to cancel.");
     }
 
     private static int RunShutdown(params string[] args)
@@ -272,11 +284,11 @@ public sealed class CommandRouter(IAppContext app)
 
     private string Thresholds()
     {
-        var sb = new StringBuilder("Eşikler:\n");
+        var sb = new StringBuilder(L.T("Eşikler:\n", "Thresholds:\n"));
         foreach (var r in app.Config.Rules)
         {
-            sb.AppendLine($"{MetricInfo.Key(r.Metric)}: {(r.Enabled ? MetricInfo.Format(r.Metric, r.Limit) : "kapalı")}" +
-                          $" · süre {r.DurationSec} sn · bekleme {r.CooldownMin} dk");
+            sb.AppendLine($"{MetricInfo.Key(r.Metric)}: {(r.Enabled ? MetricInfo.Format(r.Metric, r.Limit) : L.T("kapalı", "off"))}" +
+                          L.T($" · süre {r.DurationSec} sn · bekleme {r.CooldownMin} dk", $" · duration {r.DurationSec} s · repeat {r.CooldownMin} min"));
         }
         return sb.ToString().TrimEnd();
     }
@@ -284,7 +296,7 @@ public sealed class CommandRouter(IAppContext app)
     private string Set(string[] args)
     {
         if (args.Length != 2 || !MetricInfo.TryParse(args[0], out var metric))
-            return "Kullanım: /set <metrik> <değer|on|off>. Metrikler: cpu_temp, gpu_temp, cpu_load, gpu_load, ram, disk_temp";
+            return L.T("Kullanım: /set <metrik> <değer|on|off>. Metrikler: cpu_temp, gpu_temp, cpu_load, gpu_load, ram, disk_temp", "Usage: /set <metric> <value|on|off>. Metrics: cpu_temp, gpu_temp, cpu_load, gpu_load, ram, disk_temp");
 
         var value = args[1].ToLowerInvariant();
         string result;
@@ -292,7 +304,7 @@ public sealed class CommandRouter(IAppContext app)
         {
             var enabled = value == "on";
             app.UpdateConfig(c => c.RuleFor(metric).Enabled = enabled);
-            result = $"{MetricInfo.Label(metric)} uyarısı {(enabled ? "açıldı" : "kapatıldı")}.";
+            result = L.T($"{MetricInfo.Label(metric)} uyarısı {(enabled ? "açıldı" : "kapatıldı")}.", $"{MetricInfo.Label(metric)} alert turned {(enabled ? "on" : "off")}.");
         }
         else if (double.TryParse(value.Replace(',', '.'), NumberStyles.Float, CultureInfo.InvariantCulture, out var limit)
                  && limit is > 0 and <= 150)
@@ -303,11 +315,11 @@ public sealed class CommandRouter(IAppContext app)
                 r.Limit = limit;
                 r.Enabled = true;
             });
-            result = $"{MetricInfo.Label(metric)} eşiği {MetricInfo.Format(metric, limit)} yapıldı.";
+            result = L.T($"{MetricInfo.Label(metric)} eşiği {MetricInfo.Format(metric, limit)} yapıldı.", $"{MetricInfo.Label(metric)} threshold set to {MetricInfo.Format(metric, limit)}.");
         }
         else
         {
-            return "Değer 0-150 arasında bir sayı ya da on/off olmalı.";
+            return L.T("Değer 0-150 arasında bir sayı ya da on/off olmalı.", "The value must be a number from 0 to 150, or on/off.");
         }
         return result;
     }
@@ -316,15 +328,15 @@ public sealed class CommandRouter(IAppContext app)
     {
         var minutes = 60;
         if (args.Length > 0 && (!int.TryParse(args[0], out minutes) || minutes < 1 || minutes > 1440))
-            return "Kullanım: /mute <dakika 1-1440>";
+            return L.T("Kullanım: /mute <dakika 1-1440>", "Usage: /mute <minutes 1-1440>");
         app.Hub.MutedUntil = DateTime.Now.AddMinutes(minutes);
-        return $"Bildirimler {app.Hub.MutedUntil:HH:mm}'e kadar susturuldu.";
+        return L.T($"Bildirimler {app.Hub.MutedUntil:HH:mm}'e kadar susturuldu.", $"Notifications muted until {app.Hub.MutedUntil:HH:mm}.");
     }
 
     private string Unmute()
     {
         app.Hub.MutedUntil = DateTime.MinValue;
-        return "Bildirimler açıldı.";
+        return L.T("Bildirimler açıldı.", "Notifications are on.");
     }
 
     // When a PIN is set, it must be the last argument. Five wrong tries lock PIN commands for 15 minutes.
@@ -338,12 +350,12 @@ public sealed class CommandRouter(IAppContext app)
         {
             if (DateTime.Now < _pinLockedUntil)
             {
-                error = $"Çok fazla hatalı PIN. {_pinLockedUntil:HH:mm}'e kadar bu komutlar kilitli.";
+                error = L.T($"Çok fazla hatalı PIN. {_pinLockedUntil:HH:mm}'e kadar bu komutlar kilitli.", $"Too many wrong PINs. These commands are locked until {_pinLockedUntil:HH:mm}.");
                 return false;
             }
             if (args.Length == 0)
             {
-                error = "Bu komut PIN istiyor (son argüman olarak yazın).";
+                error = L.T("Bu komut PIN istiyor (son argüman olarak yazın).", "This command needs the PIN (as the last argument).");
                 return false;
             }
             var given = Encoding.UTF8.GetBytes(args[^1]);
@@ -355,8 +367,8 @@ public sealed class CommandRouter(IAppContext app)
                     _pinFailures = 0;
                     _pinLockedUntil = DateTime.Now.AddMinutes(15);
                 }
-                Log.Warn("Hatalı PIN denemesi");
-                error = "PIN hatalı.";
+                Log.Warn(L.T("Hatalı PIN denemesi", "Wrong PIN attempt"));
+                error = L.T("PIN hatalı.", "Wrong PIN.");
                 return false;
             }
             _pinFailures = 0;

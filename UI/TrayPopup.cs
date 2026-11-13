@@ -57,23 +57,23 @@ public sealed class TrayPopup : AeroForm
             actions.Controls.Add(b);
             return b;
         }
-        Action("Aç", true, (_, _) => Go(MainWindow.PageStatus), Icons.Status);
-        Action("Geçmiş", false, (_, _) => Go(MainWindow.PageHistory), Icons.History);
-        Action("Ayarlar", false, (_, _) => Go(MainWindow.PageSettings), Icons.App);
-        var mute = Action(app.Hub.Muted ? "Sesi aç" : "Sustur", false, (_, _) => { }, Icons.Mute);
+        Action(L.T("Aç", "Open"), true, (_, _) => Go(MainWindow.PageStatus), Icons.Status);
+        Action(L.T("Geçmiş", "History"), false, (_, _) => Go(MainWindow.PageHistory), Icons.History);
+        Action(L.T("Ayarlar", "Settings"), false, (_, _) => Go(MainWindow.PageSettings), Icons.App);
+        var mute = Action(app.Hub.Muted ? L.T("Sesi aç", "Unmute") : L.T("Sustur", "Mute"), false, (_, _) => { }, Icons.Mute);
         mute.Click += (_, _) =>
         {
             if (_app.Hub.Muted) { _app.Mute(0); Close(); }
             else ShowMuteMenu(mute);
         };
-        Action("Günlük", false, (_, _) =>
+        Action(L.T("Günlük", "Log"), false, (_, _) =>
         {
             Close();
             var path = Log.FilePath;
             if (!File.Exists(path)) File.WriteAllText(path, "");
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
         }, Icons.Log);
-        Action("Çıkış", false, (_, _) => { Close(); exit(); }, Icons.Exit);
+        Action(L.T("Çıkış", "Exit"), false, (_, _) => { Close(); exit(); }, Icons.Exit);
 
         Controls.Add(grid);
         Controls.Add(actions);
@@ -170,8 +170,8 @@ public sealed class TrayPopup : AeroForm
             tile.Invalidate();
         }
         var (status, color) = _app.Hub.Muted
-            ? ($"Susturuldu · {_app.Hub.MutedUntil:HH:mm}", Theme.Neutral)
-            : active.Count > 0 ? (active.Count == 1 ? "1 uyarı" : $"{active.Count} uyarı", Theme.DangerFill) : ("Normal", Theme.SuccessFill);
+            ? (L.T($"Susturuldu · {_app.Hub.MutedUntil:HH:mm}", $"Muted · {_app.Hub.MutedUntil:HH:mm}"), Theme.Neutral)
+            : active.Count > 0 ? (active.Count == 1 ? L.T("1 uyarı", "1 alert") : L.T($"{active.Count} uyarı", $"{active.Count} alerts"), Theme.DangerFill) : ("Normal", Theme.SuccessFill);
         if (status == _status && color == _statusColor) return;
         _status = status;
         _statusColor = color;
@@ -181,7 +181,7 @@ public sealed class TrayPopup : AeroForm
     private void ShowMuteMenu(Control anchor)
     {
         var menu = new ContextMenuStrip();
-        foreach (var (label, minutes) in new[] { ("30 dakika", 30), ("1 saat", 60), ("4 saat", 240) })
+        foreach (var (label, minutes) in new[] { (L.T("30 dakika", "30 minutes"), 30), (L.T("1 saat", "1 hour"), 60), (L.T("4 saat", "4 hours"), 240) })
             menu.Items.Add(label, null, (_, _) => { _app.Mute(minutes); Close(); });
         Theme.StyleMenu(menu);
         menu.Closed += (_, _) => BeginInvoke(menu.Dispose);

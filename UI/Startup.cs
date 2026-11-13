@@ -46,7 +46,7 @@ public static class Startup
         {
             File.WriteAllText(file, xml, System.Text.Encoding.Unicode);
             if (Run("/Create", "/TN", TaskName, "/XML", file, "/F") != 0)
-                throw new InvalidOperationException("Görev Zamanlayıcı görevi oluşturulamadı.");
+                throw new InvalidOperationException(L.T("Görev Zamanlayıcı görevi oluşturulamadı.", "Couldn't create the Task Scheduler task."));
         }
         finally
         {

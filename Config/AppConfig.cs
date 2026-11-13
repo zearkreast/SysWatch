@@ -9,6 +9,7 @@ public enum TelegramMode { Off, Notify, NotifyAndCommands }
 public enum DiscordMode { Off, Webhook, Bot }
 public enum SignalMode { Off, Notify, NotifyAndCommands }
 public enum UiTheme { Light, Dark, System }
+public enum UiLanguage { Auto, Turkish, English }
 
 public sealed class Rule
 {
@@ -107,6 +108,7 @@ public sealed class AppConfig
     // Hex colour for the tray numbers; empty follows the taskbar (light/dark).
     public string TrayNumberColor { get; set; } = "";
     public UiTheme UiTheme { get; set; } = UiTheme.Light;
+    public UiLanguage Language { get; set; } = UiLanguage.Auto;
     public bool ReduceMotion { get; set; }
     public HardwareConfig Hardware { get; set; } = new();
     public List<Rule> Rules { get; set; } = DefaultRules();
@@ -160,7 +162,7 @@ public sealed class AppConfig
         }
         catch (Exception ex) when (ex is JsonException or IOException)
         {
-            Log.Error("config.json okunamadı, varsayılanlar kullanılıyor", ex);
+            Log.Error(L.T("config.json okunamadı, varsayılanlar kullanılıyor", "Couldn't read config.json, using defaults"), ex);
         }
         var fresh = new AppConfig();
         fresh.Save();

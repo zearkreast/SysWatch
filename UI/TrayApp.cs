@@ -53,13 +53,14 @@ public sealed class TrayApp : ApplicationContext, IUiHost
     {
         _ui = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
         _config = AppConfig.Load();
+        L.Apply(_config.Language);
         Theme.SetMode(_config.UiTheme);
         Motion.UserReduced = _config.ReduceMotion;
 
         _iconOk = MakeIcon(null);
         _iconAlert = MakeIcon(Color.FromArgb(218, 54, 51));
         _iconMuted = MakeIcon(Color.FromArgb(128, 128, 128));
-        _icon = new NotifyIcon { Icon = _iconOk, Text = "SysWatch: başlatılıyor…", Visible = true };
+        _icon = new NotifyIcon { Icon = _iconOk, Text = L.T("SysWatch: başlatılıyor…", "SysWatch: starting…"), Visible = true };
         _icon.MouseUp += OnTrayMouseUp;
         Theme.Changed += OnThemeChanged;
 
@@ -80,9 +81,10 @@ public sealed class TrayApp : ApplicationContext, IUiHost
             _sensors.Open(_config.Hardware);
             if (!_sensors.PawnIoInstalled)
             {
-                Log.Warn("PawnIO kurulu değil: CPU sıcaklığı gibi bazı sensörler okunamayabilir.");
-                ShowBalloon("SysWatch: PawnIO sürücüsü kurulu değil",
-                    "CPU sıcaklığı okunamayabilir. Ayarlar > Genel'deki bağlantıdan kurabilirsiniz.");
+                Log.Warn(L.T("PawnIO kurulu değil: CPU sıcaklığı gibi bazı sensörler okunamayabilir.", "PawnIO isn't installed: some sensors such as CPU temperature may not be readable."));
+                ShowBalloon(L.T("SysWatch: PawnIO sürücüsü kurulu değil", "SysWatch: the PawnIO driver isn't installed"),
+                    L.T("CPU sıcaklığı okunamayabilir. Ayarlar > Donanım'daki bağlantıdan kurabilirsiniz.",
+                        "CPU temperature may not be readable. You can install it from the link in Settings > Hardware."));
             }
             _timer.Change(0, Timeout.Infinite);
         });
@@ -102,10 +104,10 @@ public sealed class TrayApp : ApplicationContext, IUiHost
         }
         catch (Exception ex)
         {
-            Log.Warn($"config.json izlenemiyor: {ex.Message}");
+            Log.Warn(L.T($"config.json izlenemiyor: {ex.Message}", $"Can't watch config.json: {ex.Message}"));
         }
 
-        Log.Info("SysWatch başladı.");
+        Log.Info(L.T("SysWatch başladı.", "SysWatch started."));
     }
 
     private void Tick()
@@ -128,7 +130,7 @@ public sealed class TrayApp : ApplicationContext, IUiHost
         }
         catch (Exception ex)
         {
-            Log.Error("Ölçüm döngüsü hatası", ex);
+            Log.Error(L.T("Ölçüm döngüsü hatası", "Measurement loop error"), ex);
         }
         finally
         {
@@ -142,10 +144,10 @@ public sealed class TrayApp : ApplicationContext, IUiHost
         string Part(string label, Metric m) => snap.Get(m) is { } v ? $"{label} {MetricInfo.Format(m, v)}" : "";
         var text = string.Join(" · ", new[]
         {
-            Part("CPU", Metric.CpuTemp), Part("GPU", Metric.GpuTemp), Part("Yük", Metric.CpuLoad), Part("RAM", Metric.Ram),
+            Part("CPU", Metric.CpuTemp), Part("GPU", Metric.GpuTemp), Part(L.T("Yük", "Load"), Metric.CpuLoad), Part("RAM", Metric.Ram),
         }.Where(s => s.Length > 0));
-        if (Hub.Muted) text = "Susturuldu · " + text;
-        _icon.Text = Truncate("SysWatch: " + (text.Length > 0 ? text : "veri yok"), 127);
+        if (Hub.Muted) text = L.T("Susturuldu · ", "Muted · ") + text;
+        _icon.Text = Truncate("SysWatch: " + (text.Length > 0 ? text : L.T("veri yok", "no data")), 127);
         var state = Hub.Muted ? 2 : _engine.ActiveMetrics.Count > 0 ? 1 : 0;
         _icon.Icon = state switch { 2 => _iconMuted, 1 => _iconAlert, _ => _iconOk };
 
@@ -159,7 +161,7 @@ public sealed class TrayApp : ApplicationContext, IUiHost
             var v = snap.Get(metric);
             var number = v == null ? "--" : Math.Round(v.Value).ToString("0");
             var alarm = _engine.ActiveMetrics.Contains(metric);
-            reading.Icon.Text = Truncate($"SysWatch · {MetricInfo.Label(metric)}: {(v == null ? "okunamıyor" : MetricInfo.Format(metric, v.Value))}", 127);
+            reading.Icon.Text = Truncate($"SysWatch · {MetricInfo.Label(metric)}: {(v == null ? L.T("okunamıyor", "unreadable") : MetricInfo.Format(metric, v.Value))}", 127);
             var color = alarm ? alarmColor : baseColor;
             var key = $"{number}|{color.ToArgb()}|{SystemInformation.SmallIconSize.Width}";
             if (key == reading.Key) continue;
@@ -268,7 +270,7 @@ public sealed class TrayApp : ApplicationContext, IUiHost
     public void Mute(int minutes)
     {
         Hub.MutedUntil = minutes <= 0 ? DateTime.MinValue : DateTime.Now.AddMinutes(minutes);
-        Events.Add(EventKind.Info, minutes <= 0 ? "Bildirimler açıldı" : $"Bildirimler {Hub.MutedUntil:HH:mm}'e kadar susturuldu");
+        Events.Add(EventKind.Info, minutes <= 0 ? L.T("Bildirimler açıldı", "Notifications are on") : L.T($"Bildirimler {Hub.MutedUntil:HH:mm}'e kadar susturuldu", $"Notifications muted until {Hub.MutedUntil:HH:mm}"));
         RefreshTray();
     }
 
@@ -296,6 +298,8 @@ public sealed class TrayApp : ApplicationContext, IUiHost
     public void OpenHistory() => OpenMain(MainWindow.PageHistory);
 
     public void OpenSettings() => OpenMain(MainWindow.PageSettings);
+
+    public void OpenPage(int page) => OpenMain(page);
 
     // Windows are gone once closed; compact once so the process drops back to its idle footprint.
     private void ReleaseUiMemory()
@@ -344,6 +348,7 @@ public sealed class TrayApp : ApplicationContext, IUiHost
         _config = next;
         _ui.Post(_ =>
         {
+            L.Apply(next.Language);
             Theme.SetMode(next.UiTheme);
             Motion.UserReduced = next.ReduceMotion;
             SyncReadingIcons(next);
@@ -366,7 +371,7 @@ public sealed class TrayApp : ApplicationContext, IUiHost
             lock (_configGate)
             {
                 if ((DateTime.Now - _lastOwnSave).TotalSeconds < 3) return;
-                Log.Info("config.json dışarıdan değişti, yeniden yükleniyor.");
+                Log.Info(L.T("config.json dışarıdan değişti, yeniden yükleniyor.", "config.json changed outside the app, reloading."));
                 Apply(AppConfig.Load());
             }
         });
@@ -396,8 +401,8 @@ public sealed class TrayApp : ApplicationContext, IUiHost
             }
             catch (Exception ex)
             {
-                Log.Error("signal-cli daemon başlatılamadı", ex);
-                ShowBalloon("SysWatch: Signal başlatılamadı", ex.Message);
+                Log.Error(L.T("signal-cli daemon başlatılamadı", "Couldn't start the signal-cli daemon"), ex);
+                ShowBalloon(L.T("SysWatch: Signal başlatılamadı", "SysWatch: couldn't start Signal"), ex.Message);
             }
         }
         foreach (var p in _pollers) p.Start();
@@ -467,7 +472,7 @@ public sealed class TrayApp : ApplicationContext, IUiHost
     {
         if (_disposed) return;
         _disposed = true;
-        Log.Info("SysWatch kapanıyor.");
+        Log.Info(L.T("SysWatch kapanıyor.", "SysWatch is shutting down."));
         _timer.Dispose();
         _watcher?.Dispose();
         foreach (var p in _pollers) p.Dispose();

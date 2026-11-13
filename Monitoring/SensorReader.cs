@@ -40,7 +40,7 @@ public sealed class SensorReader : IDisposable
             }
             catch (Exception ex)
             {
-                Log.Warn($"PawnIO durumu okunamadı: {ex.Message}");
+                Log.Warn(L.T($"PawnIO durumu okunamadı: {ex.Message}", $"Couldn't read the PawnIO status: {ex.Message}"));
             }
 
             // RAM comes from GlobalMemoryStatusEx; the Memory group (DIMM/SPD) stays off unless the user wants it.
@@ -61,11 +61,11 @@ public sealed class SensorReader : IDisposable
             try
             {
                 _computer.Open();
-                Log.Info("Sensörler açıldı: " + string.Join(", ", _computer.Hardware.Select(h => $"{h.HardwareType}:{h.Name}")));
+                Log.Info(L.T("Sensörler açıldı: ", "Sensors opened: ") + string.Join(", ", _computer.Hardware.Select(h => $"{h.HardwareType}:{h.Name}")));
             }
             catch (Exception ex)
             {
-                Log.Error("Sensörler açılamadı", ex);
+                Log.Error(L.T("Sensörler açılamadı", "Couldn't open the sensors"), ex);
             }
         }
     }
@@ -86,7 +86,7 @@ public sealed class SensorReader : IDisposable
                     }
                     catch (Exception ex)
                     {
-                        Log.Warn($"{hw.Name} okunamadı: {ex.Message}");
+                        Log.Warn(L.T($"{hw.Name} okunamadı: {ex.Message}", $"Couldn't read {hw.Name}: {ex.Message}"));
                     }
                 }
 
@@ -108,7 +108,7 @@ public sealed class SensorReader : IDisposable
                     if (temp == null && load == null) continue;
                     var sb = new StringBuilder(h.Name);
                     if (temp != null) sb.Append($" · {temp:0}°C");
-                    if (load != null) sb.Append($" · %{load:0}");
+                    if (load != null) sb.Append(" · " + L.Percent(load.Value));
                     snap.Details.Add(sb.ToString());
                 }
             }
@@ -131,7 +131,7 @@ public sealed class SensorReader : IDisposable
                     if (g.Temperature == null && g.Load == null) continue;
                     var sb = new StringBuilder(g.Name);
                     if (g.Temperature != null) sb.Append($" · {g.Temperature:0}°C");
-                    if (g.Load != null) sb.Append($" · %{g.Load:0}");
+                    if (g.Load != null) sb.Append(" · " + L.Percent(g.Load.Value));
                     snap.Details.Add(sb.ToString());
                 }
             }
@@ -163,25 +163,25 @@ public sealed class SensorReader : IDisposable
             foreach (var gpu in _lastGpu)
             {
                 var items = new List<SensorItem>();
-                if (gpu.Temperature is { } t) items.Add(new SensorItem("GPU sıcaklığı", "Sıcaklık", $"{t:0.0} °C"));
-                if (gpu.Load is { } l) items.Add(new SensorItem("GPU kullanımı (en yoğun motor)", "Yük", $"{l:0.0} %"));
+                if (gpu.Temperature is { } t) items.Add(new SensorItem(L.T("GPU sıcaklığı", "GPU temperature"), L.T("Sıcaklık", "Temperature"), $"{t:0.0} °C"));
+                if (gpu.Load is { } l) items.Add(new SensorItem(L.T("GPU kullanımı (en yoğun motor)", "GPU usage (busiest engine)"), L.T("Yük", "Load"), $"{l:0.0} %"));
                 if (items.Count > 0) groups.Add(new SensorGroup(gpu.Name, "Gpu", items));
             }
             foreach (var disk in _lastDisk)
             {
-                if (disk.Temperature is { } t) groups.Add(new SensorGroup(disk.Name, "Storage", [new SensorItem("Disk sıcaklığı", "Sıcaklık", $"{t:0} °C")]));
+                if (disk.Temperature is { } t) groups.Add(new SensorGroup(disk.Name, "Storage", [new SensorItem(L.T("Disk sıcaklığı", "Disk temperature"), L.T("Sıcaklık", "Temperature"), $"{t:0} °C")]));
             }
         }
         var status = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
         if (GlobalMemoryStatusEx(ref status) && status.TotalPhys > 0)
         {
             const double gb = 1024d * 1024 * 1024;
-            groups.Add(new SensorGroup("Bellek (Windows)", "Memory",
+            groups.Add(new SensorGroup(L.T("Bellek (Windows)", "Memory (Windows)"), "Memory",
             [
-                new SensorItem("Kullanım", "Yük", $"{status.MemoryLoad} %"),
-                new SensorItem("Kullanılan", "Veri", $"{(status.TotalPhys - status.AvailPhys) / gb:0.0} GB"),
-                new SensorItem("Boş", "Veri", $"{status.AvailPhys / gb:0.0} GB"),
-                new SensorItem("Toplam", "Veri", $"{status.TotalPhys / gb:0.0} GB"),
+                new SensorItem(L.T("Kullanım", "Usage"), L.T("Yük", "Load"), $"{status.MemoryLoad} %"),
+                new SensorItem(L.T("Kullanılan", "Used"), L.T("Veri", "Data"), $"{(status.TotalPhys - status.AvailPhys) / gb:0.0} GB"),
+                new SensorItem(L.T("Boş", "Available"), L.T("Veri", "Data"), $"{status.AvailPhys / gb:0.0} GB"),
+                new SensorItem(L.T("Toplam", "Total"), L.T("Veri", "Data"), $"{status.TotalPhys / gb:0.0} GB"),
             ]));
         }
         return groups;
@@ -189,20 +189,20 @@ public sealed class SensorReader : IDisposable
 
     private static string KindLabel(SensorType t) => t switch
     {
-        SensorType.Temperature => "Sıcaklık",
-        SensorType.Load => "Yük",
-        SensorType.Clock => "Saat hızı",
-        SensorType.Power => "Güç",
-        SensorType.Voltage => "Voltaj",
-        SensorType.Current => "Akım",
+        SensorType.Temperature => L.T("Sıcaklık", "Temperature"),
+        SensorType.Load => L.T("Yük", "Load"),
+        SensorType.Clock => L.T("Saat hızı", "Clock"),
+        SensorType.Power => L.T("Güç", "Power"),
+        SensorType.Voltage => L.T("Voltaj", "Voltage"),
+        SensorType.Current => L.T("Akım", "Current"),
         SensorType.Fan => "Fan",
-        SensorType.Control => "Fan kontrolü",
-        SensorType.Data or SensorType.SmallData => "Veri",
-        SensorType.Throughput => "Aktarım",
-        SensorType.Level => "Seviye",
-        SensorType.Frequency => "Frekans",
-        SensorType.Energy => "Enerji",
-        SensorType.Factor => "Oran",
+        SensorType.Control => L.T("Fan kontrolü", "Fan control"),
+        SensorType.Data or SensorType.SmallData => L.T("Veri", "Data"),
+        SensorType.Throughput => L.T("Aktarım", "Throughput"),
+        SensorType.Level => L.T("Seviye", "Level"),
+        SensorType.Frequency => L.T("Frekans", "Frequency"),
+        SensorType.Energy => L.T("Enerji", "Energy"),
+        SensorType.Factor => L.T("Oran", "Factor"),
         _ => t.ToString(),
     };
 
@@ -274,7 +274,7 @@ public sealed class SensorReader : IDisposable
         }
         catch (Exception ex)
         {
-            Log.Warn($"Sensörler kapatılırken hata: {ex.Message}");
+            Log.Warn(L.T($"Sensörler kapatılırken hata: {ex.Message}", $"Error while closing the sensors: {ex.Message}"));
         }
         _computer = null;
         _nativeGpu?.Dispose();

@@ -19,7 +19,7 @@ public abstract class Poller : IDisposable
         _cts = new CancellationTokenSource();
         var ct = _cts.Token;
         _task = Task.Run(() => LoopAsync(ct), ct);
-        Log.Info($"{Name} komut dinleyicisi başladı.");
+        Log.Info(L.T($"{Name} komut dinleyicisi başladı.", $"{Name} command listener started."));
     }
 
     private async Task LoopAsync(CancellationToken ct)
@@ -40,7 +40,7 @@ public abstract class Poller : IDisposable
             {
                 var wait = ex is HttpRequestException { StatusCode: HttpStatusCode.TooManyRequests }
                     ? TimeSpan.FromSeconds(30) : backoff;
-                Log.Warn($"{Name} dinleyici hatası, {wait.TotalSeconds:0} sn sonra yeniden denenecek: {ex.Message}");
+                Log.Warn(L.T($"{Name} dinleyici hatası, {wait.TotalSeconds:0} sn sonra yeniden denenecek: {ex.Message}", $"{Name} listener error, retrying in {wait.TotalSeconds:0} s: {ex.Message}"));
                 try
                 {
                     await Task.Delay(wait, ct).ConfigureAwait(false);
@@ -107,7 +107,7 @@ public sealed class TelegramPoller(IAppContext app, CommandRouter router) : Poll
                 if (cfg.Telegram.Mode != TelegramMode.NotifyAndCommands) continue;
                 if (chatId != cfg.Telegram.ChatId || msg?["chat"]?["type"]?.GetValue<string>() != "private")
                 {
-                    Log.Warn($"Telegram: izinsiz sohbetten komut yok sayıldı (chat {chatId}).");
+                    Log.Warn(L.T($"Telegram: izinsiz sohbetten komut yok sayıldı (chat {chatId}).", $"Telegram: ignored a command from a chat that isn't allowed (chat {chatId})."));
                     continue;
                 }
                 if (DateTimeOffset.UtcNow - date > MaxCommandAge) continue;
@@ -136,7 +136,7 @@ public sealed class SignalListener(IAppContext app, CommandRouter router) : Poll
         while (!ct.IsCancellationRequested)
         {
             var line = await reader.ReadLineAsync(ct).ConfigureAwait(false);
-            if (line == null) throw new IOException("signal-cli olay akışı kapandı.");
+            if (line == null) throw new IOException(L.T("signal-cli olay akışı kapandı.", "The signal-cli event stream closed."));
             if (line.StartsWith("data:", StringComparison.Ordinal))
             {
                 data.Append(line.AsSpan(5).Trim());
@@ -184,7 +184,7 @@ public sealed class SignalListener(IAppContext app, CommandRouter router) : Poll
         if (!CommandRouter.LooksLikeCommand(text))
         {
             if (env["dataMessage"]?["message"] != null && source != s.Recipient && source != s.Account)
-                Log.Warn("Signal: izinsiz numaradan mesaj yok sayıldı.");
+                Log.Warn(L.T("Signal: izinsiz numaradan mesaj yok sayıldı.", "Signal: ignored a message from a number that isn't allowed."));
             return;
         }
 

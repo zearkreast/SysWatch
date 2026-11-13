@@ -34,8 +34,8 @@ internal sealed class DashboardView : Panel
         _disk = Card("Disk");
 
         var bottom = new Panel { Dock = DockStyle.Bottom, Height = (int)(unit * 2.8) };
-        var mute = new FlatButton("Bildirimleri sustur") { Image = Icons.Get(Icons.Mute, Icons.SizeFor(font) - 4) };
-        var details = new FlatButton("Detaylar") { Image = Icons.Get(Icons.Details, Icons.SizeFor(font) - 4) };
+        var mute = new FlatButton(L.T("Bildirimleri sustur", "Mute notifications")) { Image = Icons.Get(Icons.Mute, Icons.SizeFor(font) - 4) };
+        var details = new FlatButton(L.T("Detaylar", "Details")) { Image = Icons.Get(Icons.Details, Icons.SizeFor(font) - 4) };
         details.Click += (_, _) => openDetails();
         bottom.Controls.Add(_note);
         bottom.Controls.Add(mute);
@@ -79,7 +79,7 @@ internal sealed class DashboardView : Panel
             var rule = cfg.RuleFor(metric);
             card.Alarm = active.Contains(main) || (secondary is { } sec && active.Contains(sec));
             card.Limit = card.Alarm && rule.Enabled ? rule.Limit : null;
-            card.Label = card.Alarm && rule.Enabled ? $"{label} · eşik {MetricInfo.Format(metric, rule.Limit)}" : label;
+            card.Label = card.Alarm && rule.Enabled ? L.T($"{label} · eşik {MetricInfo.Format(metric, rule.Limit)}", $"{label} · threshold {MetricInfo.Format(metric, rule.Limit)}") : label;
             card.Invalidate();
         }
 
@@ -89,16 +89,16 @@ internal sealed class DashboardView : Panel
         Fill(_disk, "Disk", Metric.DiskTemp, null);
 
         _note.Text = snap?.Get(Metric.CpuTemp) == null && cfg.Hardware.Cpu
-            ? "CPU sıcaklığı için PawnIO sürücüsü gerekli"
-            : snap == null ? "İlk ölçüm bekleniyor…" : $"Son ölçüm {snap.Time:HH:mm:ss}";
+            ? L.T("CPU sıcaklığı için PawnIO sürücüsü gerekli", "CPU temperature needs the PawnIO driver")
+            : snap == null ? L.T("İlk ölçüm bekleniyor…", "Waiting for the first reading…") : L.T($"Son ölçüm {snap.Time:HH:mm:ss}", $"Last reading {snap.Time:HH:mm:ss}");
     }
 
     private void ShowMuteMenu(Control anchor)
     {
         var menu = new ContextMenuStrip();
-        foreach (var (label, minutes) in new[] { ("30 dakika", 30), ("1 saat", 60), ("4 saat", 240) })
+        foreach (var (label, minutes) in new[] { (L.T("30 dakika", "30 minutes"), 30), (L.T("1 saat", "1 hour"), 60), (L.T("4 saat", "4 hours"), 240) })
             menu.Items.Add(label, null, (_, _) => _app.Mute(minutes));
-        menu.Items.Add("Susturmayı kaldır", null, (_, _) => _app.Mute(0));
+        menu.Items.Add(L.T("Susturmayı kaldır", "Unmute"), null, (_, _) => _app.Mute(0));
         Theme.StyleMenu(menu);
         menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
         menu.Show(anchor, new Point(0, anchor.Height));
@@ -125,8 +125,8 @@ internal sealed class HistoryView : Panel
         var unit = font.Height;
         _list = new EventList(font) { Dock = DockStyle.Fill };
         var bottom = new Panel { Dock = DockStyle.Bottom, Height = (int)(unit * 2.8) };
-        var clear = new FlatButton("Geçmişi temizle");
-        var log = new FlatButton("Günlük") { Image = Icons.Get(Icons.Log, Icons.SizeFor(font) - 4) };
+        var clear = new FlatButton(L.T("Geçmişi temizle", "Clear history"));
+        var log = new FlatButton(L.T("Günlük", "Log")) { Image = Icons.Get(Icons.Log, Icons.SizeFor(font) - 4) };
         log.Click += (_, _) => MainWindow.OpenLog();
         bottom.Controls.Add(_summary);
         bottom.Controls.Add(clear);
@@ -139,7 +139,7 @@ internal sealed class HistoryView : Panel
         };
         clear.Click += (_, _) =>
         {
-            if (MessageBox.Show(FindForm(), "Tüm uyarı geçmişi silinsin mi? Bu geri alınamaz.", "Geçmişi temizle",
+            if (MessageBox.Show(FindForm(), L.T("Tüm uyarı geçmişi silinsin mi? Bu geri alınamaz.", "Delete the whole alert history? This can't be undone."), L.T("Geçmişi temizle", "Clear history"),
                     MessageBoxButtons.YesNo, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button2) != DialogResult.Yes) return;
             _app.Events.Clear();
             Reload();
@@ -155,7 +155,7 @@ internal sealed class HistoryView : Panel
         var entries = _app.Events.ReadAll();
         _list.SetEntries(entries);
         var alerts = entries.Count(e => e.Kind == EventKind.Alert);
-        _summary.Text = entries.Count == 0 ? "Son 7 gün" : $"Son 7 gün · {entries.Count} kayıt, {alerts} uyarı";
+        _summary.Text = entries.Count == 0 ? L.T("Son 7 gün", "Last 7 days") : L.T($"Son 7 gün · {entries.Count} kayıt, {alerts} uyarı", $"Last 7 days · {entries.Count} entries, {alerts} alerts");
     }
 
     private void OnAdded(EventEntry _)
@@ -209,9 +209,9 @@ internal sealed class EventList : ScrollableControl
     private int TotalHeight() => _rows.Sum(r => r.Header != null ? HeaderHeight : RowHeight);
 
     private static string DayName(DateTime d) =>
-        d == DateTime.Today ? "Bugün" :
-        d == DateTime.Today.AddDays(-1) ? "Dün" :
-        d.ToString("d MMMM dddd", CultureInfo.GetCultureInfo("tr-TR"));
+        d == DateTime.Today ? L.T("Bugün", "Today") :
+        d == DateTime.Today.AddDays(-1) ? L.T("Dün", "Yesterday") :
+        d.ToString(L.T("d MMMM dddd", "dddd, MMMM d"), L.Culture);
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -220,7 +220,7 @@ internal sealed class EventList : ScrollableControl
         g.Clear(Draw.Backdrop(this));
         if (_rows.Count == 0)
         {
-            Draw.Text(g, "Henüz uyarı yok. Bir eşik aşıldığında burada görünecek.", Font, Theme.TextMuted,
+            Draw.Text(g, L.T("Henüz uyarı yok. Bir eşik aşıldığında burada görünecek.", "No alerts yet. They show up here when a threshold is crossed."), Font, Theme.TextMuted,
                 ClientRectangle, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.WordBreak);
             return;
         }
@@ -258,7 +258,7 @@ internal sealed class EventList : ScrollableControl
             EventKind.Alert => Icons.Thresholds,
             EventKind.Recovered => Icons.Recovered,
             EventKind.Command => Icons.Terminal,
-            _ when entry.Text.Contains("sustur", StringComparison.OrdinalIgnoreCase) => Icons.Mute,
+            _ when entry.Text.Contains("sustur", StringComparison.OrdinalIgnoreCase) || entry.Text.Contains("mute", StringComparison.OrdinalIgnoreCase) => Icons.Mute,
             _ => Icons.Info,
         };
         var d = Math.Min(32, (int)(r.Height * 0.62));
@@ -340,11 +340,11 @@ internal sealed class DetailsView : Panel
         Dock = DockStyle.Fill;
         _list = new SensorList(font, openHardware) { Dock = DockStyle.Fill };
         var header = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, Padding = new Padding(0, 0, 0, 6) };
-        var backLink = new LinkLabel { Text = "‹ Durum", AutoSize = true, Margin = new Padding(0, 8, 12, 0) };
+        var backLink = new LinkLabel { Text = L.T("‹ Durum", "‹ Status"), AutoSize = true, Margin = new Padding(0, 8, 12, 0) };
         backLink.LinkClicked += (_, _) => back();
         var title = new Label
         {
-            Text = "Tüm okumalar", AutoSize = true,
+            Text = L.T("Tüm okumalar", "All readings"), AutoSize = true,
             Font = new Font(font.FontFamily, font.Size * 1.35f), Margin = new Padding(0, 0, 0, 0),
         };
         header.Controls.Add(backLink);
@@ -363,16 +363,16 @@ internal sealed class DetailsView : Panel
     {
         var hw = _app.Config.Hardware;
         var off = new List<(string Name, string Icon)>();
-        if (!hw.Cpu) off.Add(("İşlemci (CPU)", Icons.Hardware));
-        if (!hw.Gpu) off.Add(("Ekran kartı (GPU)", Icons.Gpu));
-        else if (!hw.GpuDetailed) off.Add(("GPU ayrıntılı sensörler (saat hızı, güç, fan…)", Icons.Gpu));
-        if (!hw.Storage) off.Add(("Diskler", Icons.Disk));
-        else if (!hw.StorageDetailed) off.Add(("Disk ayrıntılı sensörler (SMART)", Icons.Disk));
-        if (!hw.Motherboard) off.Add(("Anakart (voltaj, fan, sıcaklık)", Icons.Board));
-        if (!hw.Memory) off.Add(("RAM modülleri", Icons.Memory));
-        if (!hw.Controller) off.Add(("Fan kontrolcüleri", Icons.Board));
-        if (!hw.Network) off.Add(("Ağ bağdaştırıcıları", Icons.Network));
-        if (!hw.Psu) off.Add(("Güç kaynağı (PSU)", Icons.Power));
+        if (!hw.Cpu) off.Add((L.T("İşlemci (CPU)", "Processor (CPU)"), Icons.Hardware));
+        if (!hw.Gpu) off.Add((L.T("Ekran kartı (GPU)", "Graphics card (GPU)"), Icons.Gpu));
+        else if (!hw.GpuDetailed) off.Add((L.T("GPU ayrıntılı sensörler (saat hızı, güç, fan…)", "GPU detailed sensors (clocks, power, fans…)"), Icons.Gpu));
+        if (!hw.Storage) off.Add((L.T("Diskler", "Disks"), Icons.Disk));
+        else if (!hw.StorageDetailed) off.Add((L.T("Disk ayrıntılı sensörler (SMART)", "Disk detailed sensors (SMART)"), Icons.Disk));
+        if (!hw.Motherboard) off.Add((L.T("Anakart (voltaj, fan, sıcaklık)", "Motherboard (voltages, fans, temperatures)"), Icons.Board));
+        if (!hw.Memory) off.Add((L.T("RAM modülleri", "Memory modules"), Icons.Memory));
+        if (!hw.Controller) off.Add((L.T("Fan kontrolcüleri", "Fan controllers"), Icons.Board));
+        if (!hw.Network) off.Add((L.T("Ağ bağdaştırıcıları", "Network adapters"), Icons.Network));
+        if (!hw.Psu) off.Add((L.T("Güç kaynağı (PSU)", "Power supply (PSU)"), Icons.Power));
         _list.SetData(_app.Sensors(), off);
     }
 
@@ -422,7 +422,7 @@ internal sealed class SensorList : ScrollableControl
         }
         if (off.Count > 0)
         {
-            _rows.Add(new Row(RowKind.OffHeader, "Ayarlarda kapalı olan sensör grupları"));
+            _rows.Add(new Row(RowKind.OffHeader, L.T("Ayarlarda kapalı olan sensör grupları", "Sensor groups switched off in settings")));
             foreach (var (name, icon) in off) _rows.Add(new Row(RowKind.Off, name, Icon: icon));
         }
         AutoScrollMinSize = new Size(0, _rows.Sum(RowHeight) + 12);
@@ -443,7 +443,7 @@ internal sealed class SensorList : ScrollableControl
 
     private Rectangle LinkRect(Rectangle row)
     {
-        var w = TextRenderer.MeasureText("Donanım ayarlarında aç ›", Font).Width;
+        var w = TextRenderer.MeasureText(L.T("Donanım ayarlarında aç ›", "Turn on in Hardware settings ›"), Font).Width;
         return new Rectangle(row.Right - w - 10, row.Y, w, row.Height);
     }
 
@@ -498,7 +498,7 @@ internal sealed class SensorList : ScrollableControl
                         Draw.Text(g, row.Text, Font, Theme.TextMuted, new Rectangle(r.X + osz + 18, r.Y, r.Width - osz - 200, r.Height));
                         var link = LinkRect(r);
                         using (var lf = new Font(Font, i == _hoverLink ? FontStyle.Underline : FontStyle.Regular))
-                            Draw.Text(g, "Donanım ayarlarında aç ›", lf, Theme.Accent, link, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
+                            Draw.Text(g, L.T("Donanım ayarlarında aç ›", "Turn on in Hardware settings ›"), lf, Theme.Accent, link, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
                         break;
                 }
             }

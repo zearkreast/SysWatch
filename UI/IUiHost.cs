@@ -14,4 +14,5 @@ public interface IUiHost : IAppContext
     void Mute(int minutes);
     void OpenHistory();
     void OpenSettings();
+    void OpenPage(int page);
 }

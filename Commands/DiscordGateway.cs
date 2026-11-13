@@ -20,7 +20,7 @@ public sealed class DiscordGateway(IAppContext app, CommandRouter router) : Poll
         var d = app.Config.Discord;
         if (d.AllowedUserId.Length == 0)
         {
-            Log.Warn("Discord: izinli kullanıcı ID'si boş, komutlar dinlenmiyor.");
+            Log.Warn(L.T("Discord: izinli kullanıcı ID'si boş, komutlar dinlenmiyor.", "Discord: the allowed user ID is empty, so commands are not handled."));
             await Task.Delay(Timeout.Infinite, ct).ConfigureAwait(false);
         }
 
@@ -29,7 +29,7 @@ public sealed class DiscordGateway(IAppContext app, CommandRouter router) : Poll
         {
             await DiscordApi.RegisterCommandsAsync(d.BotToken, _appId, DiscordCommands.Definitions(), ct).ConfigureAwait(false);
             _registered = true;
-            Log.Info("Discord slash komutları kaydedildi.");
+            Log.Info(L.T("Discord slash komutları kaydedildi.", "Discord slash commands registered."));
         }
 
         using var ws = new ClientWebSocket();
@@ -43,7 +43,7 @@ public sealed class DiscordGateway(IAppContext app, CommandRouter router) : Poll
             while (!sessionCts.IsCancellationRequested)
             {
                 var msg = await ReceiveAsync(ws, sessionCts.Token).ConfigureAwait(false)
-                          ?? throw new IOException($"Discord bağlantısı kapandı ({ws.CloseStatus} {ws.CloseStatusDescription}).");
+                          ?? throw new IOException(L.T($"Discord bağlantısı kapandı ({ws.CloseStatus} {ws.CloseStatusDescription}).", $"Discord connection closed ({ws.CloseStatus} {ws.CloseStatusDescription})."));
                 if (msg["s"] is JsonValue s) seq = s.GetValue<long>();
 
                 switch (msg["op"]?.GetValue<int>())
@@ -67,9 +67,9 @@ public sealed class DiscordGateway(IAppContext app, CommandRouter router) : Poll
                         break;
                     case 7: // Reconnect
                     case 9: // Invalid session
-                        throw new IOException("Discord yeniden bağlanma istedi.");
+                        throw new IOException(L.T("Discord yeniden bağlanma istedi.", "Discord asked to reconnect."));
                     case 0 when msg["t"]?.GetValue<string>() == "READY":
-                        Log.Info("Discord bağlantısı hazır.");
+                        Log.Info(L.T("Discord bağlantısı hazır.", "Discord connection ready."));
                         break;
                     case 0 when msg["t"]?.GetValue<string>() == "INTERACTION_CREATE":
                         _ = HandleInteractionAsync(msg["d"]!, ct);
@@ -114,8 +114,8 @@ public sealed class DiscordGateway(IAppContext app, CommandRouter router) : Poll
             var userId = (interaction["member"]?["user"] ?? interaction["user"])?["id"]?.GetValue<string>();
             if (userId != cfg.Discord.AllowedUserId)
             {
-                Log.Warn("Discord: izinsiz kullanıcıdan komut yok sayıldı.");
-                await DiscordApi.InteractionReplyAsync(id, token, "Bu bilgisayarı yönetme yetkiniz yok.", ct).ConfigureAwait(false);
+                Log.Warn(L.T("Discord: izinsiz kullanıcıdan komut yok sayıldı.", "Discord: ignored a command from a user who isn't allowed."));
+                await DiscordApi.InteractionReplyAsync(id, token, L.T("Bu bilgisayarı yönetme yetkiniz yok.", "You aren't allowed to control this computer."), ct).ConfigureAwait(false);
                 return;
             }
 
@@ -127,7 +127,7 @@ public sealed class DiscordGateway(IAppContext app, CommandRouter router) : Poll
         }
         catch (Exception ex)
         {
-            Log.Error("Discord komutu işlenemedi", ex);
+            Log.Error(L.T("Discord komutu işlenemedi", "Couldn't handle a Discord command"), ex);
         }
     }
 
@@ -176,19 +176,28 @@ public static class DiscordCommands
 {
     private const int SubString = 3, SubInteger = 4;
 
+    // English names and descriptions, with Turkish ones that Discord shows to clients set to Turkish.
+    // Interactions always arrive with the English option names.
     public static JsonArray Definitions()
     {
-        static JsonObject Opt(int type, string name, string desc, bool required = false, JsonArray? choices = null)
+        static JsonObject Tr(string text) => new() { ["tr"] = text };
+
+        static JsonObject Opt(int type, string name, string trName, string desc, string trDesc, bool required = false, JsonArray? choices = null)
         {
-            var o = new JsonObject { ["type"] = type, ["name"] = name, ["description"] = desc, ["required"] = required };
+            var o = new JsonObject
+            {
+                ["type"] = type, ["name"] = name, ["name_localizations"] = Tr(trName),
+                ["description"] = desc, ["description_localizations"] = Tr(trDesc), ["required"] = required,
+            };
             if (choices != null) o["choices"] = choices;
             return o;
         }
 
-        static JsonObject Cmd(string name, string desc, params JsonObject[] options) => new()
+        static JsonObject Cmd(string name, string desc, string trDesc, params JsonObject[] options) => new()
         {
             ["name"] = name,
             ["description"] = desc,
+            ["description_localizations"] = Tr(trDesc),
             ["type"] = 1,
             ["integration_types"] = new JsonArray(0, 1),
             ["contexts"] = new JsonArray(0, 1, 2),
@@ -196,25 +205,32 @@ public static class DiscordCommands
         };
 
         var metrics = new JsonArray();
-        foreach (var (key, label) in new[] { ("cpu_temp", "CPU sıcaklığı"), ("gpu_temp", "GPU sıcaklığı"), ("cpu_load", "CPU kullanımı"),
-                     ("gpu_load", "GPU kullanımı"), ("ram", "RAM kullanımı"), ("disk_temp", "Disk sıcaklığı") })
-            metrics.Add(new JsonObject { ["name"] = label, ["value"] = key });
+        foreach (var (key, en, tr) in new[]
+                 {
+                     ("cpu_temp", "CPU temperature", "CPU sıcaklığı"), ("gpu_temp", "GPU temperature", "GPU sıcaklığı"),
+                     ("cpu_load", "CPU usage", "CPU kullanımı"), ("gpu_load", "GPU usage", "GPU kullanımı"),
+                     ("ram", "RAM usage", "RAM kullanımı"), ("disk_temp", "Disk temperature", "Disk sıcaklığı"),
+                 })
+            metrics.Add(new JsonObject { ["name"] = en, ["name_localizations"] = Tr(tr), ["value"] = key });
 
-        var pin = Opt(SubString, "pin", "Güvenlik PIN'i (açıksa)");
+        var pin = Opt(SubString, "pin", "pin", "Security PIN (if enabled)", "Güvenlik PIN'i (açıksa)");
         return
         [
-            Cmd("status", "SysWatch: anlık sıcaklık ve kullanım değerleri"),
-            Cmd("top", "SysWatch: en çok CPU/RAM kullanan işlemler"),
-            Cmd("kill", "SysWatch: bir işlemi sonlandırır", Opt(SubString, "hedef", "İşlem adı veya PID", true), pin.DeepClone().AsObject()),
-            Cmd("shutdown", "SysWatch: bilgisayarı kapatır (onay ister)", Opt(SubInteger, "dakika", "Kaç dakika sonra (varsayılan 1)"), pin.DeepClone().AsObject()),
-            Cmd("confirm", "SysWatch: bekleyen kapatmayı onaylar"),
-            Cmd("cancel", "SysWatch: planlanmış kapatmayı iptal eder"),
-            Cmd("thresholds", "SysWatch: eşikleri gösterir"),
-            Cmd("set", "SysWatch: eşik değiştirir",
-                Opt(SubString, "metrik", "Hangi değer", true, metrics),
-                Opt(SubString, "deger", "Sayı ya da on/off", true)),
-            Cmd("mute", "SysWatch: bildirimleri susturur", Opt(SubInteger, "dakika", "Kaç dakika (varsayılan 60)")),
-            Cmd("unmute", "SysWatch: bildirimleri açar"),
+            Cmd("status", "SysWatch: current temperatures and usage", "SysWatch: anlık sıcaklık ve kullanım değerleri"),
+            Cmd("top", "SysWatch: processes using the most CPU/RAM", "SysWatch: en çok CPU/RAM kullanan işlemler"),
+            Cmd("kill", "SysWatch: ends a process", "SysWatch: bir işlemi sonlandırır",
+                Opt(SubString, "target", "hedef", "Process name or PID", "İşlem adı veya PID", true), pin.DeepClone().AsObject()),
+            Cmd("shutdown", "SysWatch: shuts the PC down (asks for confirmation)", "SysWatch: bilgisayarı kapatır (onay ister)",
+                Opt(SubInteger, "minutes", "dakika", "In how many minutes (default 1)", "Kaç dakika sonra (varsayılan 1)"), pin.DeepClone().AsObject()),
+            Cmd("confirm", "SysWatch: confirms the pending shutdown", "SysWatch: bekleyen kapatmayı onaylar"),
+            Cmd("cancel", "SysWatch: cancels the scheduled shutdown", "SysWatch: planlanmış kapatmayı iptal eder"),
+            Cmd("thresholds", "SysWatch: shows the thresholds", "SysWatch: eşikleri gösterir"),
+            Cmd("set", "SysWatch: changes a threshold", "SysWatch: eşik değiştirir",
+                Opt(SubString, "metric", "metrik", "Which reading", "Hangi değer", true, metrics),
+                Opt(SubString, "value", "deger", "A number, or on/off", "Sayı ya da on/off", true)),
+            Cmd("mute", "SysWatch: mutes notifications", "SysWatch: bildirimleri susturur",
+                Opt(SubInteger, "minutes", "dakika", "For how many minutes (default 60)", "Kaç dakika (varsayılan 60)")),
+            Cmd("unmute", "SysWatch: turns notifications back on", "SysWatch: bildirimleri açar"),
         ];
     }
 
@@ -227,10 +243,10 @@ public static class DiscordCommands
         var parts = new List<string> { "/" + name };
         foreach (var key in name switch
                  {
-                     "kill" => new[] { "hedef", "pin" },
-                     "shutdown" => new[] { "dakika", "pin" },
-                     "set" => new[] { "metrik", "deger" },
-                     "mute" => new[] { "dakika" },
+                     "kill" => new[] { "target", "pin" },
+                     "shutdown" => new[] { "minutes", "pin" },
+                     "set" => new[] { "metric", "value" },
+                     "mute" => new[] { "minutes" },
                      _ => Array.Empty<string>(),
                  })
         {
@@ -238,7 +254,7 @@ public static class DiscordCommands
             if (!string.IsNullOrWhiteSpace(v)) parts.Add(v.Trim().Replace(' ', '_'));
         }
         // /shutdown with only a PIN would read the PIN as minutes; give the default explicitly.
-        if (name == "shutdown" && Get("dakika") == null && Get("pin") != null) parts.Insert(1, "1");
+        if (name == "shutdown" && Get("minutes") == null && Get("pin") != null) parts.Insert(1, "1");
         return string.Join(' ', parts);
     }
 }

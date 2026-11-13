@@ -15,8 +15,8 @@ public sealed class Notification
 
     public string MinimalText => Kind switch
     {
-        NotificationKind.Alert => Subject.Length > 0 ? $"SysWatch: {Subject} uyarısı var." : "SysWatch: PC'de uyarı var.",
-        NotificationKind.Recovered => Subject.Length > 0 ? $"SysWatch: {Subject} normale döndü." : "SysWatch: Durum normale döndü.",
+        NotificationKind.Alert => Subject.Length > 0 ? L.T($"SysWatch: {Subject} uyarısı var.", $"SysWatch: {Subject} alert.") : L.T("SysWatch: PC'de uyarı var.", "SysWatch: there is an alert on the PC."),
+        NotificationKind.Recovered => Subject.Length > 0 ? L.T($"SysWatch: {Subject} normale döndü.", $"SysWatch: {Subject} is back to normal.") : L.T("SysWatch: Durum normale döndü.", "SysWatch: back to normal."),
         _ => $"SysWatch: {Title}",
     };
 
@@ -32,16 +32,16 @@ public sealed class Notification
     {
         Kind = NotificationKind.Alert,
         Subject = MetricInfo.Label(rule.Metric),
-        Title = $"{MetricInfo.Label(rule.Metric)} yüksek{(repeat ? " (devam ediyor)" : "")}",
-        Body = $"Şu an: {MetricInfo.Format(rule.Metric, value)} · Eşik: {MetricInfo.Format(rule.Metric, rule.Limit)}",
+        Title = L.T($"{MetricInfo.Label(rule.Metric)} yüksek{(repeat ? " (devam ediyor)" : "")}", $"{MetricInfo.Label(rule.Metric)} high{(repeat ? " (ongoing)" : "")}"),
+        Body = L.T($"Şu an: {MetricInfo.Format(rule.Metric, value)} · Eşik: {MetricInfo.Format(rule.Metric, rule.Limit)}", $"Now: {MetricInfo.Format(rule.Metric, value)} · Threshold: {MetricInfo.Format(rule.Metric, rule.Limit)}"),
     };
 
     public static Notification Recovered(Rule rule, double value, double peak) => new()
     {
         Kind = NotificationKind.Recovered,
         Subject = MetricInfo.Label(rule.Metric),
-        Title = $"{MetricInfo.Label(rule.Metric)} normale döndü",
-        Body = $"Şu an: {MetricInfo.Format(rule.Metric, value)} · En yüksek: {MetricInfo.Format(rule.Metric, peak)}",
+        Title = L.T($"{MetricInfo.Label(rule.Metric)} normale döndü", $"{MetricInfo.Label(rule.Metric)} back to normal"),
+        Body = L.T($"Şu an: {MetricInfo.Format(rule.Metric, value)} · En yüksek: {MetricInfo.Format(rule.Metric, peak)}", $"Now: {MetricInfo.Format(rule.Metric, value)} · Peak: {MetricInfo.Format(rule.Metric, peak)}"),
     };
 
     public static Notification Info(string title, string body = "") => new()

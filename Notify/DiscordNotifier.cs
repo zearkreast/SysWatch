@@ -44,16 +44,18 @@ public static class DiscordApi
         }
         return code switch
         {
-            50278 or 50007 => "Bot size DM gönderemiyor: botu hesabınıza eklemediniz (ya da yetkisini kaldırdınız) ve ortak bir sunucunuz yok. " +
-                              "Ayarlar > Discord'da \"Hesabıma ekle\" ile botu hesabınıza ekleyin.",
-            50001 => "Bot bu kanalı göremiyor. Botu sunucuya ekleyin ve kanalda \"Kanalı Görüntüle\" izni verin.",
-            50013 => "Botun bu kanala mesaj gönderme izni yok (Mesaj Gönder / Mesaj Geçmişini Oku izinlerini verin).",
-            10003 => "Kanal bulunamadı. Kanal ID'sini kontrol edin (kanala sağ tık > Kanal ID'sini Kopyala).",
-            10013 => "Kullanıcı bulunamadı. İzinli kullanıcı ID'sini kontrol edin (adınıza sağ tık > Kullanıcı ID'sini Kopyala).",
-            10015 => "Webhook bulunamadı ya da silinmiş. Webhook URL'sini yeniden kopyalayın.",
-            50035 => "Discord girilen değeri kabul etmedi. Kanal ve kullanıcı ID'leri sadece rakamlardan oluşmalı.",
-            _ when ex.StatusCode == System.Net.HttpStatusCode.Unauthorized => "Bot token geçersiz. Developer Portal > Bot > Reset Token ile yenisini alın.",
-            _ when ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests => "Discord hız sınırına takıldı, biraz sonra tekrar deneyin.",
+            50278 or 50007 => L.T("Bot size DM gönderemiyor: botu hesabınıza eklemediniz (ya da yetkisini kaldırdınız) ve ortak bir sunucunuz yok. " +
+                                  "Ayarlar > Discord'da \"Hesabıma ekle\" ile botu hesabınıza ekleyin.",
+                                  "The bot can't DM you: you haven't added it to your account (or removed its authorization) and you share no server. " +
+                                  "Use \"Add to my account\" in Settings > Discord to add the bot to your account."),
+            50001 => L.T("Bot bu kanalı göremiyor. Botu sunucuya ekleyin ve kanalda \"Kanalı Görüntüle\" izni verin.", "The bot can't see this channel. Add it to the server and give it the \"View Channel\" permission."),
+            50013 => L.T("Botun bu kanala mesaj gönderme izni yok (Mesaj Gönder / Mesaj Geçmişini Oku izinlerini verin).", "The bot isn't allowed to post in this channel (grant Send Messages and Read Message History)."),
+            10003 => L.T("Kanal bulunamadı. Kanal ID'sini kontrol edin (kanala sağ tık > Kanal ID'sini Kopyala).", "Channel not found. Check the channel ID (right-click the channel > Copy Channel ID)."),
+            10013 => L.T("Kullanıcı bulunamadı. İzinli kullanıcı ID'sini kontrol edin (adınıza sağ tık > Kullanıcı ID'sini Kopyala).", "User not found. Check the allowed user ID (right-click your name > Copy User ID)."),
+            10015 => L.T("Webhook bulunamadı ya da silinmiş. Webhook URL'sini yeniden kopyalayın.", "Webhook not found or deleted. Copy the webhook URL again."),
+            50035 => L.T("Discord girilen değeri kabul etmedi. Kanal ve kullanıcı ID'leri sadece rakamlardan oluşmalı.", "Discord rejected the value. Channel and user IDs contain digits only."),
+            _ when ex.StatusCode == System.Net.HttpStatusCode.Unauthorized => L.T("Bot token geçersiz. Developer Portal > Bot > Reset Token ile yenisini alın.", "Invalid bot token. Get a new one under Developer Portal > Bot > Reset Token."),
+            _ when ex.StatusCode == System.Net.HttpStatusCode.TooManyRequests => L.T("Discord hız sınırına takıldı, biraz sonra tekrar deneyin.", "Discord rate limit reached, try again shortly."),
             _ => ex.Message,
         };
     }
@@ -70,13 +72,13 @@ public static class DiscordApi
     {
         var node = await Call(Bot(Http.Json(HttpMethod.Post, $"{Base}/users/@me/channels",
             new { recipient_id = userId }), token), ct).ConfigureAwait(false);
-        return node?["id"]?.GetValue<string>() ?? throw new InvalidOperationException("Discord DM kanalı açılamadı.");
+        return node?["id"]?.GetValue<string>() ?? throw new InvalidOperationException(L.T("Discord DM kanalı açılamadı.", "Couldn't open a Discord DM channel."));
     }
 
     public static async Task<string> ApplicationIdAsync(string token, CancellationToken ct)
     {
         var app = await Call(Bot(new HttpRequestMessage(HttpMethod.Get, $"{Base}/oauth2/applications/@me"), token), ct).ConfigureAwait(false);
-        return app?["id"]?.GetValue<string>() ?? throw new InvalidOperationException("Uygulama ID'si alınamadı.");
+        return app?["id"]?.GetValue<string>() ?? throw new InvalidOperationException(L.T("Uygulama ID'si alınamadı.", "Couldn't get the application ID."));
     }
 
     // userInstall: "Add to My Apps" (works without a shared server); otherwise the bot joins a server.
