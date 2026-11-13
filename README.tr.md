@@ -37,6 +37,7 @@ CPU veya GPU sıcaklığı, işlemci, ekran kartı ya da RAM kullanımı belirle
 - **Gizlilik:** Telemetri yok. Tokenlar ve parolalar Windows DPAPI ile şifreli saklanır. "Az bilgi" modunda kanala değer ya da bilgisayar adı gitmez.
 - **Frutiger Aero arayüz:** Bulanık cam başlık, parlak kartlar, son birkaç dakikanın grafikleri. Açık tema varsayılan, koyu tema bir tık uzakta. "Hareketleri azalt" seçeneği var.
 - **Tepside sayılar:** İsterseniz seçtiğiniz okumalar tepside ayrı birer sayı olarak durur.
+- **Otomatik güncelleme:** SysWatch GitHub'da yeni sürüm olup olmadığına bakar ve varsa indirip SHA-256 özetini doğruladıktan sonra kendisi kurar. Kurulum sihirbazı bunu isteyip istemediğinizi sorar; Ayarlar > Uygulama'dan açıp kapatabilir, **Şimdi denetle** ile hemen denetleyebilirsiniz.
 - **Türkçe ve İngilizce:** Windows'un dili Türkçeyse arayüz Türkçe, değilse İngilizce açılır. Ayarlar > Görünüm > Dil'den değiştirilebilir.
 
 <p align="center">
@@ -47,7 +48,7 @@ CPU veya GPU sıcaklığı, işlemci, ekran kartı ya da RAM kullanımı belirle
 
 | Hangisi? | Dosya |
 | --- | --- |
-| **Çoğu kişi için:** kurulum dosyası. Başlat menüsüne ekler, isterseniz Windows açılınca başlatır, eksikse .NET 8'i kendisi kurar. | [`SysWatch_x64-setup.exe`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-setup.exe) |
+| **Çoğu kişi için:** kurulum dosyası. Başlat menüsüne ekler, isterseniz Windows açılınca başlatır, eksikse .NET 8'i kendisi kurar, SysWatch'ı güncel tutabilir. | [`SysWatch_x64-setup.exe`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-setup.exe) |
 | **Taşınabilir:** kurulum yok. Klasöre açıp çalıştırın, ayarlar klasörün içindeki `data`'da durur. [.NET 8 Masaüstü Çalışma Zamanı](https://dotnet.microsoft.com/download/dotnet/8.0) gerekir. | [`SysWatch_x64-portable.zip`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-portable.zip) |
 
 1. Kurulum dosyasını indirip açın.
@@ -58,7 +59,7 @@ CPU veya GPU sıcaklığı, işlemci, ekran kartı ya da RAM kullanımı belirle
 
 **CPU sıcaklığı için PawnIO:** İşlemci sıcaklığını okumak için ücretsiz [PawnIO](https://pawnio.eu/) sürücüsü gerekir. Kurulu değilse CPU sıcaklığı "okunamıyor" görünür, diğer her şey çalışır.
 
-**Güncelleme:** Yeni kurulum dosyasını aynı şekilde çalıştırın, ayarlarınız kalır. **Kaldırma:** Windows Ayarlar > Uygulamalar'dan. Kaldırıcı ayarlarınızı da silmek isteyip istemediğinizi sorar.
+**Güncelleme:** Otomatik güncelleme açıksa SysWatch kendini günceller (kurulu ve taşınabilir sürüm ikisi de) ve birkaç saniye sonra yeniden açılır. Kapalıysa yeni kurulum dosyasını aynı şekilde çalıştırın, ayarlarınız kalır. **Kaldırma:** Windows Ayarlar > Uygulamalar'dan. Kaldırıcı ayarlarınızı da silmek isteyip istemediğinizi sorar.
 
 ## Kullanım
 

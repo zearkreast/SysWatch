@@ -110,6 +110,9 @@ public sealed class AppConfig
     public UiTheme UiTheme { get; set; } = UiTheme.Light;
     public UiLanguage Language { get; set; } = UiLanguage.Auto;
     public bool ReduceMotion { get; set; }
+    public bool AutoUpdate { get; set; } = true;
+    // The version that last ran, so the first start after an update can say so.
+    public string LastVersion { get; set; } = "";
     public HardwareConfig Hardware { get; set; } = new();
     public List<Rule> Rules { get; set; } = DefaultRules();
     public LocalConfig Local { get; set; } = new();

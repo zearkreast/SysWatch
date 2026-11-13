@@ -15,4 +15,5 @@ public interface IUiHost : IAppContext
     void OpenHistory();
     void OpenSettings();
     void OpenPage(int page);
+    Task InstallUpdateAsync(Updates.UpdateInfo update);
 }

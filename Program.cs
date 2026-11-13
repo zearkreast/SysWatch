@@ -37,6 +37,27 @@ internal static class Program
             return;
         }
 
+        // Used by the installer's "automatic updates" option.
+        if (args.Length == 2 && args[0] == "--set-auto-update")
+        {
+            var cfg = Config.AppConfig.Load();
+            cfg.AutoUpdate = args[1] == "on";
+            cfg.Save();
+            return;
+        }
+        // A portable update starts the new exe before the old one has exited; wait for it to let go of the lock.
+        if (args.Length == 2 && args[0] == "--after-update" && int.TryParse(args[1], out var oldPid))
+        {
+            try
+            {
+                using var old = System.Diagnostics.Process.GetProcessById(oldPid);
+                old.WaitForExit(30000);
+            }
+            catch (ArgumentException)
+            {
+            }
+        }
+
         L.Apply(Config.AppConfig.Load().Language);
         using var mutex = new Mutex(true, @"Global\SysWatch.Instance", out var first);
         if (!first)

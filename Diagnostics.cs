@@ -201,5 +201,6 @@ internal sealed class DiagHost : UI.IUiHost
     public void Mute(int minutes) { }
     public void OpenHistory() { }
     public void OpenPage(int page) { }
+    public Task InstallUpdateAsync(Updates.UpdateInfo update) => Task.CompletedTask;
     public void OpenSettings() { }
 }

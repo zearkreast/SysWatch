@@ -37,6 +37,7 @@ SysWatch tells you when CPU or GPU temperature, or CPU, GPU or RAM usage, stays 
 - **Privacy:** no telemetry. Tokens and passwords are stored encrypted with Windows DPAPI. In minimal mode, no values or computer name leave the PC.
 - **Frutiger Aero interface:** a blurred glass title bar, glossy cards and charts of the last few minutes. Light theme by default, dark theme one click away, and a reduced-motion option.
 - **Tray numbers:** chosen readings can sit in the tray as their own numbers.
+- **Automatic updates:** SysWatch checks GitHub for a new release and installs it by itself, after verifying the download's SHA-256. The installer asks whether you want this; you can switch it on or off under Settings > App, where **Check now** checks right away.
 - **English and Turkish:** the interface follows the Windows display language (Turkish if Windows is in Turkish, English otherwise). Change it under Settings > Appearance > Language.
 
 <p align="center">
@@ -47,7 +48,7 @@ SysWatch tells you when CPU or GPU temperature, or CPU, GPU or RAM usage, stays 
 
 | Which one? | File |
 | --- | --- |
-| **For most people:** the installer. Adds a Start menu entry, can start SysWatch with Windows, and installs .NET 8 itself if it's missing. | [`SysWatch_x64-setup.exe`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-setup.exe) |
+| **For most people:** the installer. Adds a Start menu entry, can start SysWatch with Windows, installs .NET 8 itself if it's missing, and can keep SysWatch up to date. | [`SysWatch_x64-setup.exe`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-setup.exe) |
 | **Portable:** nothing to install. Unzip and run; settings stay in the `data` folder inside. Needs the [.NET 8 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/8.0). | [`SysWatch_x64-portable.zip`](https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-portable.zip) |
 
 1. Download and open the installer.
@@ -58,7 +59,7 @@ SysWatch tells you when CPU or GPU temperature, or CPU, GPU or RAM usage, stays 
 
 **PawnIO for CPU temperature:** reading the processor temperature needs the free [PawnIO](https://pawnio.eu/) driver. Without it, CPU temperature shows as unreadable and everything else works.
 
-**Updating:** run the new installer the same way; your settings stay. **Uninstalling:** from Windows Settings > Apps. The uninstaller asks whether to delete your settings too.
+**Updating:** with automatic updates on, SysWatch updates itself (both the installed and the portable build) and reopens a few seconds later. Otherwise run the new installer the same way; your settings stay. **Uninstalling:** from Windows Settings > Apps. The uninstaller asks whether to delete your settings too.
 
 ## Using it
 

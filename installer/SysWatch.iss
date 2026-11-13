@@ -56,6 +56,8 @@ Name: "en"; MessagesFile: "compiler:Default.isl"
 [CustomMessages]
 tr.StartWithWindows=Windows açılınca SysWatch'ı başlat
 en.StartWithWindows=Start SysWatch when Windows starts
+tr.AutoUpdate=Güncellemeleri otomatik denetle ve kur (Ayarlar > Uygulama'dan değiştirilebilir)
+en.AutoUpdate=Check for and install updates automatically (can be changed in Settings > App)
 tr.LaunchApp=SysWatch'ı şimdi başlat
 en.LaunchApp=Start SysWatch now
 tr.RuntimeTitle=.NET 8 Masaüstü Çalışma Zamanı
@@ -69,6 +71,7 @@ en.RemoveData=Also delete settings, history and the log?%n%n%1
 
 [Tasks]
 Name: "startup"; Description: "{cm:StartWithWindows}"
+Name: "autoupdate"; Description: "{cm:AutoUpdate}"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
@@ -82,9 +85,14 @@ Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\{#AppExe}"; Parameters: "--enable-startup"; Flags: runhidden waituntilterminated; Tasks: startup
+; A silent update (/UPDATE=1, started by SysWatch) must not undo settings changed in the app since,
+; so only an install the user runs writes the task choices.
+Filename: "{app}\{#AppExe}"; Parameters: "--enable-startup"; Flags: runhidden waituntilterminated; Tasks: startup; Check: not IsUpdate
+Filename: "{app}\{#AppExe}"; Parameters: "--set-auto-update on"; Flags: runhidden waituntilterminated; Tasks: autoupdate; Check: not IsUpdate
+Filename: "{app}\{#AppExe}"; Parameters: "--set-auto-update off"; Flags: runhidden waituntilterminated; Tasks: not autoupdate; Check: not IsUpdate
 ; runascurrentuser: the app requires elevation and the installer already has it, so no second UAC prompt.
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchApp}"; Flags: postinstall nowait skipifsilent runascurrentuser
+Filename: "{app}\{#AppExe}"; Flags: nowait runascurrentuser; Check: IsUpdate
 
 [UninstallRun]
 Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN SysWatch /F"; Flags: runhidden; RunOnceId: "RemoveStartupTask"
@@ -92,6 +100,11 @@ Filename: "{sys}\schtasks.exe"; Parameters: "/Delete /TN SysWatch /F"; Flags: ru
 [Code]
 var
   DownloadPage: TDownloadWizardPage;
+
+function IsUpdate: Boolean;
+begin
+  Result := ExpandConstant('{param:UPDATE|0}') = '1';
+end;
 
 function RuntimeInstalled: Boolean;
 var

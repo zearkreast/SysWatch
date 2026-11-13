@@ -90,6 +90,18 @@ jobs:
           if ($LASTEXITCODE -ne 0) { Get-Content "$env:RUNNER_TEMP\install.log"; throw 'The "start with Windows" task was not created.' }
           $v = (Get-Item "$dir\SysWatch.exe").VersionInfo.ProductVersion
           if (-not $v.StartsWith('${{ steps.version.outputs.version }}')) { throw "Installed exe reports version $v." }
+          $config = "$env:APPDATA\SysWatch\config.json"
+          if (-not ((Get-Content $config -Raw | ConvertFrom-Json).AutoUpdate -eq $false)) { throw 'Unticking "automatic updates" did not turn them off.' }
+
+          # A silent update, as SysWatch starts it, reopens the app and leaves the user's settings alone.
+          $cfg = Get-Content $config -Raw | ConvertFrom-Json
+          $cfg.AutoUpdate = $true
+          $cfg | ConvertTo-Json -Depth 10 | Set-Content $config -Encoding utf8
+          $p = Start-Process dist/SysWatch_x64-setup.exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/UPDATE=1', "/LOG=$env:RUNNER_TEMP\update.log" -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content "$env:RUNNER_TEMP\update.log"; throw "The silent update exited with $($p.ExitCode)." }
+          for ($i = 0; $i -lt 20 -and -not (Get-Process SysWatch -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Milliseconds 500 }
+          if (-not (Get-Process SysWatch -ErrorAction SilentlyContinue)) { Get-Content "$env:RUNNER_TEMP\update.log"; throw 'SysWatch did not reopen after the silent update.' }
+          if (-not ((Get-Content $config -Raw | ConvertFrom-Json).AutoUpdate -eq $true)) { throw 'The silent update changed the automatic-update setting.' }
 
           $p = Start-Process "$dir\unins000.exe" -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "Uninstall exited with $($p.ExitCode)." }

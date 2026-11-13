@@ -5,6 +5,7 @@ using SysWatch.Commands;
 using SysWatch.Config;
 using SysWatch.Monitoring;
 using SysWatch.Notify;
+using SysWatch.Updates;
 
 namespace SysWatch.UI;
 
@@ -21,6 +22,8 @@ public sealed class TrayApp : ApplicationContext, IUiHost
     private readonly object _configGate = new();
     private readonly List<Poller> _pollers = new();
     private readonly System.Threading.Timer _timer;
+    private readonly System.Threading.Timer _updateTimer;
+    private int _updating;
     private readonly FileSystemWatcher? _watcher;
     private volatile AppConfig _config;
     private string _channelKey = "";
@@ -108,6 +111,61 @@ public sealed class TrayApp : ApplicationContext, IUiHost
         }
 
         Log.Info(L.T("SysWatch başladı.", "SysWatch started."));
+        AnnounceUpdate();
+        Updater.CleanUp();
+        _updateTimer = new System.Threading.Timer(_ => _ = AutoUpdateAsync(), null, UpdateFirstCheck, UpdateInterval);
+    }
+
+    private static readonly TimeSpan UpdateFirstCheck = TimeSpan.FromMinutes(2), UpdateInterval = TimeSpan.FromHours(12);
+
+    private void AnnounceUpdate()
+    {
+        var current = Updater.Current.ToString(3);
+        if (_config.LastVersion == current) return;
+        if (Version.TryParse(_config.LastVersion, out var previous) && previous < Updater.Current)
+        {
+            var text = L.T($"SysWatch {current} sürümüne güncellendi.", $"SysWatch was updated to {current}.");
+            Log.Info(text);
+            Events.Add(EventKind.Info, text);
+            ShowBalloon("SysWatch", text);
+        }
+        UpdateConfig(c => c.LastVersion = current);
+    }
+
+    private async Task AutoUpdateAsync()
+    {
+        if (_disposed || !_config.AutoUpdate || Updater.Kind == InstallKind.None) return;
+        try
+        {
+            var update = await Updater.CheckAsync(CancellationToken.None).ConfigureAwait(false);
+            if (update != null) await InstallUpdateAsync(update).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            Log.Warn(L.T($"Güncelleme denetlenemedi: {ex.Message}", $"Couldn't check for updates: {ex.Message}"));
+        }
+    }
+
+    public async Task InstallUpdateAsync(UpdateInfo update)
+    {
+        if (Interlocked.Exchange(ref _updating, 1) == 1) return;
+        try
+        {
+            var version = update.Version.ToString(3);
+            Log.Info(L.T($"SysWatch {version} indiriliyor.", $"Downloading SysWatch {version}."));
+            var file = await Updater.DownloadAsync(update, CancellationToken.None).ConfigureAwait(false);
+            ShowBalloon(L.T("SysWatch güncelleniyor", "Updating SysWatch"),
+                L.T($"{version} sürümü kuruluyor; SysWatch birkaç saniye içinde yeniden açılacak.", $"Installing {version}; SysWatch will reopen in a few seconds."));
+            Log.Info(L.T($"SysWatch {version} kuruluyor.", $"Installing SysWatch {version}."));
+            Updater.Apply(file);
+            _ui.Post(_ => ExitThread(), null);
+        }
+        catch (Exception ex)
+        {
+            Interlocked.Exchange(ref _updating, 0);
+            Log.Error(L.T("Güncelleme kurulamadı", "Couldn't install the update"), ex);
+            throw;
+        }
     }
 
     private void Tick()
@@ -474,6 +532,7 @@ public sealed class TrayApp : ApplicationContext, IUiHost
         _disposed = true;
         Log.Info(L.T("SysWatch kapanıyor.", "SysWatch is shutting down."));
         _timer.Dispose();
+        _updateTimer.Dispose();
         _watcher?.Dispose();
         foreach (var p in _pollers) p.Dispose();
         _signalHost.Dispose();

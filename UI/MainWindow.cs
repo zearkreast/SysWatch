@@ -48,6 +48,8 @@ public sealed class MainWindow : AeroForm
 
     private readonly CheckBox _pinOn = new() { Text = L.T("/kill ve /shutdown için PIN iste", "Require a PIN for /kill and /shutdown"), AutoSize = true };
     private readonly TextBox _pin = Secret();
+    private readonly CheckBox _autoUpdate = new() { Text = L.T("Güncellemeleri otomatik denetle ve kur", "Check for and install updates automatically"), AutoSize = true };
+    private readonly Label _updateStatus = new() { AutoSize = true, Tag = "muted", MaximumSize = new Size(460, 0) };
     private readonly CheckBox _startup = new() { Text = L.T("Oturum açılınca başlat (Görev Zamanlayıcı)", "Start when I sign in (Task Scheduler)"), AutoSize = true };
     private readonly CheckBox _reduceMotion = new() { Text = L.T("Hareketleri azalt (animasyonları kapatır, daha hafif çalışır)", "Reduce motion (turns animations off, uses fewer resources)"), AutoSize = true };
     private readonly ComboBox _language = Combo(L.T("Otomatik (Windows dili)", "Automatic (Windows language)"), "Türkçe", "English");
@@ -606,11 +608,58 @@ public sealed class MainWindow : AeroForm
         Row(t, L.T("Günlük", "Log"), log);
         Row(t, "", Note(L.T("Uygulamanın olay günlüğü: ölçüm hataları, gönderim sonuçları, gelen komutlar. 1 MB'ı geçince eskisi syswatch.log.old olarak saklanır.", "The app's event log: measurement errors, delivery results, incoming commands. Past 1 MB the old one is kept as syswatch.log.old.")));
         Row(t, "", Link(L.T("Ayar, geçmiş ve günlük klasörünü aç", "Open the settings, history and log folder"), Log.DataDir));
+        var updateRow = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false };
+        var check = new FlatButton(L.T("Şimdi denetle", "Check now"));
+        check.Click += async (_, _) => await CheckForUpdate(check);
+        updateRow.Controls.Add(_autoUpdate);
+        updateRow.Controls.Add(check);
+        Row(t, L.T("Güncelleme", "Updates"), updateRow);
+        if (Updates.Updater.Kind == Updates.InstallKind.None)
+        {
+            _autoUpdate.Enabled = check.Enabled = false;
+            _updateStatus.Text = L.T("Bu derleme kurulu ya da taşınabilir sürüm olmadığı için kendini güncellemez.",
+                "This build isn't the installed or portable edition, so it doesn't update itself.");
+        }
+        Row(t, "", _updateStatus);
         var version = typeof(MainWindow).Assembly.GetName().Version?.ToString(3) ?? "";
         Row(t, L.T("Sürüm", "Version"), Link(L.T($"SysWatch {version}{(Log.Portable ? " (taşınabilir)" : "")} · GPL-3.0 özgür yazılım", $"SysWatch {version}{(Log.Portable ? " (portable)" : "")} · GPL-3.0 free software"), "https://github.com/zearkreast/SysWatch"));
         var notices = Path.Combine(AppContext.BaseDirectory, "THIRD-PARTY-NOTICES.txt");
         Row(t, "", Link(L.T("Lisanslar ve üçüncü taraf bileşenler", "Licenses and third-party components"), File.Exists(notices) ? notices : "https://github.com/zearkreast/SysWatch/blob/main/THIRD-PARTY-NOTICES.md"));
         return Page(L.T("Uygulama", "App"), t);
+    }
+
+    private async Task CheckForUpdate(Button button)
+    {
+        button.Enabled = false;
+        _updateStatus.Text = L.T("Denetleniyor…", "Checking…");
+        try
+        {
+            var update = await Updates.Updater.CheckAsync(CancellationToken.None);
+            if (IsDisposed) return;
+            if (update == null)
+            {
+                _updateStatus.Text = L.T($"SysWatch güncel ({Updates.Updater.Current.ToString(3)}).", $"SysWatch is up to date ({Updates.Updater.Current.ToString(3)}).");
+                return;
+            }
+            var version = update.Version.ToString(3);
+            if (MessageBox.Show(this, L.T($"SysWatch {version} çıktı. Şimdi kurulsun mu?\n\nSysWatch birkaç saniyeliğine kapanıp yeniden açılır.",
+                        $"SysWatch {version} is available. Install it now?\n\nSysWatch closes and reopens within a few seconds."),
+                    "SysWatch", MessageBoxButtons.YesNo, MessageBoxIcon.Question) != DialogResult.Yes)
+            {
+                _updateStatus.Text = L.T($"SysWatch {version} kurulmayı bekliyor.", $"SysWatch {version} is waiting to be installed.");
+                return;
+            }
+            _updateStatus.Text = L.T($"SysWatch {version} indiriliyor…", $"Downloading SysWatch {version}…");
+            await _app.InstallUpdateAsync(update);
+        }
+        catch (Exception ex)
+        {
+            if (!IsDisposed) _updateStatus.Text = L.T("Güncelleme başarısız: ", "Update failed: ") + ex.Message;
+        }
+        finally
+        {
+            if (!IsDisposed) button.Enabled = Updates.Updater.Kind != Updates.InstallKind.None;
+        }
     }
 
     internal static void OpenLog()
@@ -805,6 +854,7 @@ public sealed class MainWindow : AeroForm
         _trayColorIndex = preset >= 0 ? preset : TrayColorPresets.Length;
         _trayColor.SelectedIndex = _trayColorIndex;
         _language.SelectedIndex = (int)_cfg.Language;
+        _autoUpdate.Checked = _cfg.AutoUpdate;
         _uiTheme.SelectedIndex = (int)_cfg.UiTheme;
         _reduceMotion.Checked = _cfg.ReduceMotion;
         var hw = _cfg.Hardware;
@@ -853,6 +903,7 @@ public sealed class MainWindow : AeroForm
         c.TrayReadings = _trayReadings.Where(kv => kv.Value.Checked).Select(kv => kv.Key).ToList();
         c.TrayNumberColor = _trayColorIndex < TrayColorPresets.Length ? TrayColorPresets[_trayColorIndex] : _customTrayColor;
         c.Language = (UiLanguage)Math.Max(0, _language.SelectedIndex);
+        c.AutoUpdate = _autoUpdate.Checked;
         c.UiTheme = (UiTheme)Math.Max(0, _uiTheme.SelectedIndex);
         c.ReduceMotion = _reduceMotion.Checked;
         c.Hardware = new HardwareConfig
