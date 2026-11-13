@@ -10,13 +10,18 @@ public sealed class Snapshot
     public DateTime Time { get; init; }
     public Dictionary<Metric, double> Values { get; init; } = new();
     public List<string> Details { get; init; } = new();
+    // The sensors charted on the status page, by SensorItem.Id.
+    public Dictionary<string, SensorSample> Watched { get; init; } = new();
 
     public double? Get(Metric m) => Values.TryGetValue(m, out var v) ? v : null;
 }
 
-public sealed record SensorItem(string Name, string Kind, string Value);
+// Id stays the same across restarts (LHM's sensor identifier, or "native/..." for the Windows reads), so charts can be saved by it.
+public sealed record SensorItem(string Id, string Name, string Type, string Value, string Min, string Max);
 
 public sealed record SensorGroup(string Name, string Category, IReadOnlyList<SensorItem> Items);
+
+public sealed record SensorSample(string Name, string Hardware, string Type, double Value);
 
 public sealed class SensorReader : IDisposable
 {
@@ -26,8 +31,13 @@ public sealed class SensorReader : IDisposable
     private NativeDisk? _nativeDisk;
     private List<NativeGpu.Reading> _lastGpu = new();
     private List<NativeDisk.Reading> _lastDisk = new();
+    private volatile string[] _watched = [];
+    // Lowest and highest value since start for the Windows reads; LHM keeps its own.
+    private readonly Dictionary<string, (double Min, double Max)> _range = new();
 
     public bool PawnIoInstalled { get; private set; }
+
+    public void Watch(IEnumerable<string> ids) => _watched = ids.Distinct().ToArray();
 
     public void Open(HardwareConfig hw)
     {
@@ -113,12 +123,23 @@ public sealed class SensorReader : IDisposable
                 }
             }
 
+            var native = new Dictionary<string, SensorSample>();
+            void Track(string id, string name, string hardware, string type, double? value)
+            {
+                if (value is not { } v) return;
+                native[id] = new SensorSample(name, hardware, type, v);
+                _range[id] = _range.TryGetValue(id, out var r) ? (Math.Min(r.Min, v), Math.Max(r.Max, v)) : (v, v);
+            }
+
             if (_nativeDisk != null)
             {
                 var disks = _lastDisk = _nativeDisk.Read();
                 Put(snap, Metric.DiskTemp, disks.Max(d => d.Temperature));
                 foreach (var d in disks.Where(d => d.Temperature != null))
+                {
                     snap.Details.Add($"{d.Name} · {d.Temperature:0}°C");
+                    Track(DiskTempId(d), DiskTempName, d.Name, "Temperature", d.Temperature);
+                }
             }
 
             if (_nativeGpu != null)
@@ -133,13 +154,44 @@ public sealed class SensorReader : IDisposable
                     if (g.Temperature != null) sb.Append($" · {g.Temperature:0}°C");
                     if (g.Load != null) sb.Append(" · " + L.Percent(g.Load.Value));
                     snap.Details.Add(sb.ToString());
+                    Track(GpuTempId(g), GpuTempName, g.Name, "Temperature", g.Temperature);
+                    Track(GpuLoadId(g), GpuLoadName, g.Name, "Load", g.Load);
                 }
             }
-        }
 
-        var ram = RamPercent();
-        if (ram != null) snap.Values[Metric.Ram] = ram.Value;
+            if (ReadMemory() is { } mem)
+            {
+                snap.Values[Metric.Ram] = mem.Percent;
+                Track(RamLoadId, RamLoadName, MemoryGroupName, "Load", mem.Percent);
+                Track(RamUsedId, RamUsedName, MemoryGroupName, "Data", mem.UsedGb);
+                Track(RamFreeId, RamFreeName, MemoryGroupName, "Data", mem.FreeGb);
+            }
+
+            FillWatched(snap, native);
+        }
         return snap;
+    }
+
+    private void FillWatched(Snapshot snap, Dictionary<string, SensorSample> native)
+    {
+        var watched = _watched;
+        if (watched.Length == 0) return;
+        Dictionary<string, (ISensor Sensor, IHardware Hardware)>? lhm = null;
+        foreach (var id in watched)
+        {
+            if (native.TryGetValue(id, out var sample))
+            {
+                snap.Watched[id] = sample;
+                continue;
+            }
+            if (_computer == null || id.StartsWith("native/", StringComparison.Ordinal)) continue;
+            lhm ??= _computer.Hardware
+                .SelectMany(hw => hw.Sensors.Concat(hw.SubHardware.SelectMany(sh => sh.Sensors)).Select(sn => (Sensor: sn, Hardware: hw)))
+                .GroupBy(p => p.Sensor.Identifier.ToString())
+                .ToDictionary(g => g.Key, g => g.First());
+            if (lhm.TryGetValue(id, out var p) && p.Sensor.Value is { } v && !float.IsNaN(v))
+                snap.Watched[id] = new SensorSample(p.Sensor.Name, p.Hardware.Name, p.Sensor.SensorType.ToString(), v);
+        }
     }
 
     // Every sensor of every open hardware group, with the values from the last reading (no extra hardware access).
@@ -155,7 +207,12 @@ public sealed class SensorReader : IDisposable
                     var items = hw.Sensors.Concat(hw.SubHardware.SelectMany(sh => sh.Sensors))
                         .Where(sn => sn.Value.HasValue && !float.IsNaN(sn.Value.Value))
                         .OrderBy(sn => sn.SensorType).ThenBy(sn => sn.Index)
-                        .Select(sn => new SensorItem(sn.Name, KindLabel(sn.SensorType), FormatValue(sn.SensorType, sn.Value!.Value)))
+                        .Select(sn =>
+                        {
+                            var type = sn.SensorType.ToString();
+                            return new SensorItem(sn.Identifier.ToString(), sn.Name, type, SensorFormat.Format(type, sn.Value!.Value),
+                                sn.Min is { } lo ? SensorFormat.Format(type, lo) : "", sn.Max is { } hi ? SensorFormat.Format(type, hi) : "");
+                        })
                         .ToList();
                     if (items.Count > 0) groups.Add(new SensorGroup(hw.Name, hw.HardwareType.ToString(), items));
                 }
@@ -163,65 +220,45 @@ public sealed class SensorReader : IDisposable
             foreach (var gpu in _lastGpu)
             {
                 var items = new List<SensorItem>();
-                if (gpu.Temperature is { } t) items.Add(new SensorItem(L.T("GPU sıcaklığı", "GPU temperature"), L.T("Sıcaklık", "Temperature"), $"{t:0.0} °C"));
-                if (gpu.Load is { } l) items.Add(new SensorItem(L.T("GPU kullanımı (en yoğun motor)", "GPU usage (busiest engine)"), L.T("Yük", "Load"), $"{l:0.0} %"));
+                if (gpu.Temperature is { } t) items.Add(NativeItem(GpuTempId(gpu), GpuTempName, "Temperature", t));
+                if (gpu.Load is { } l) items.Add(NativeItem(GpuLoadId(gpu), GpuLoadName, "Load", l));
                 if (items.Count > 0) groups.Add(new SensorGroup(gpu.Name, "Gpu", items));
             }
             foreach (var disk in _lastDisk)
             {
-                if (disk.Temperature is { } t) groups.Add(new SensorGroup(disk.Name, "Storage", [new SensorItem(L.T("Disk sıcaklığı", "Disk temperature"), L.T("Sıcaklık", "Temperature"), $"{t:0} °C")]));
+                if (disk.Temperature is { } t) groups.Add(new SensorGroup(disk.Name, "Storage", [NativeItem(DiskTempId(disk), DiskTempName, "Temperature", t)]));
             }
-        }
-        var status = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
-        if (GlobalMemoryStatusEx(ref status) && status.TotalPhys > 0)
-        {
-            const double gb = 1024d * 1024 * 1024;
-            groups.Add(new SensorGroup(L.T("Bellek (Windows)", "Memory (Windows)"), "Memory",
-            [
-                new SensorItem(L.T("Kullanım", "Usage"), L.T("Yük", "Load"), $"{status.MemoryLoad} %"),
-                new SensorItem(L.T("Kullanılan", "Used"), L.T("Veri", "Data"), $"{(status.TotalPhys - status.AvailPhys) / gb:0.0} GB"),
-                new SensorItem(L.T("Boş", "Available"), L.T("Veri", "Data"), $"{status.AvailPhys / gb:0.0} GB"),
-                new SensorItem(L.T("Toplam", "Total"), L.T("Veri", "Data"), $"{status.TotalPhys / gb:0.0} GB"),
-            ]));
+            if (ReadMemory() is { } mem)
+            {
+                groups.Add(new SensorGroup(MemoryGroupName, "Memory",
+                [
+                    NativeItem(RamLoadId, RamLoadName, "Load", mem.Percent),
+                    NativeItem(RamUsedId, RamUsedName, "Data", mem.UsedGb),
+                    NativeItem(RamFreeId, RamFreeName, "Data", mem.FreeGb),
+                    new SensorItem("native/ram/total", L.T("Toplam", "Total"), "Data", SensorFormat.Format("Data", mem.TotalGb), "", ""),
+                ]));
+            }
         }
         return groups;
     }
 
-    private static string KindLabel(SensorType t) => t switch
+    private SensorItem NativeItem(string id, string name, string type, double value)
     {
-        SensorType.Temperature => L.T("Sıcaklık", "Temperature"),
-        SensorType.Load => L.T("Yük", "Load"),
-        SensorType.Clock => L.T("Saat hızı", "Clock"),
-        SensorType.Power => L.T("Güç", "Power"),
-        SensorType.Voltage => L.T("Voltaj", "Voltage"),
-        SensorType.Current => L.T("Akım", "Current"),
-        SensorType.Fan => "Fan",
-        SensorType.Control => L.T("Fan kontrolü", "Fan control"),
-        SensorType.Data or SensorType.SmallData => L.T("Veri", "Data"),
-        SensorType.Throughput => L.T("Aktarım", "Throughput"),
-        SensorType.Level => L.T("Seviye", "Level"),
-        SensorType.Frequency => L.T("Frekans", "Frequency"),
-        SensorType.Energy => L.T("Enerji", "Energy"),
-        SensorType.Factor => L.T("Oran", "Factor"),
-        _ => t.ToString(),
-    };
+        var (min, max) = _range.TryGetValue(id, out var r) ? (SensorFormat.Format(type, r.Min), SensorFormat.Format(type, r.Max)) : ("", "");
+        return new SensorItem(id, name, type, SensorFormat.Format(type, value), min, max);
+    }
 
-    private static string FormatValue(SensorType t, float v) => t switch
-    {
-        SensorType.Temperature => $"{v:0.0} °C",
-        SensorType.Load or SensorType.Control or SensorType.Level or SensorType.Humidity => $"{v:0.0} %",
-        SensorType.Clock => $"{v:0} MHz",
-        SensorType.Power => $"{v:0.0} W",
-        SensorType.Voltage => $"{v:0.000} V",
-        SensorType.Current => $"{v:0.00} A",
-        SensorType.Fan => $"{v:0} RPM",
-        SensorType.Data => $"{v:0.0} GB",
-        SensorType.SmallData => $"{v:0} MB",
-        SensorType.Throughput => v >= 1048576 ? $"{v / 1048576:0.0} MB/s" : $"{v / 1024:0.0} KB/s",
-        SensorType.Frequency => $"{v:0} Hz",
-        SensorType.Energy => $"{v:0} mWh",
-        _ => $"{v:0.##}",
-    };
+    private static string GpuTempId(NativeGpu.Reading g) => $"native/gpu/{g.Name}/temperature";
+    private static string GpuLoadId(NativeGpu.Reading g) => $"native/gpu/{g.Name}/load";
+    private static string DiskTempId(NativeDisk.Reading d) => $"native/disk/{d.Name}/temperature";
+    private const string RamLoadId = "native/ram/load", RamUsedId = "native/ram/used", RamFreeId = "native/ram/available";
+    private static string GpuTempName => L.T("GPU sıcaklığı", "GPU temperature");
+    private static string GpuLoadName => L.T("GPU kullanımı (en yoğun motor)", "GPU usage (busiest engine)");
+    private static string DiskTempName => L.T("Disk sıcaklığı", "Disk temperature");
+    private static string MemoryGroupName => L.T("Bellek (Windows)", "Memory (Windows)");
+    private static string RamLoadName => L.T("Kullanım", "Usage");
+    private static string RamUsedName => L.T("Kullanılan", "Used");
+    private static string RamFreeName => L.T("Boş", "Available");
 
     private IEnumerable<IHardware> Of(params HardwareType[] types) =>
         _computer!.Hardware.Where(h => types.Contains(h.HardwareType));
@@ -259,11 +296,13 @@ public sealed class SensorReader : IDisposable
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GlobalMemoryStatusEx(ref MemoryStatusEx buffer);
 
-    private static double? RamPercent()
+    private static (double Percent, double UsedGb, double FreeGb, double TotalGb)? ReadMemory()
     {
         var status = new MemoryStatusEx { Length = (uint)Marshal.SizeOf<MemoryStatusEx>() };
         if (!GlobalMemoryStatusEx(ref status) || status.TotalPhys == 0) return null;
-        return 100.0 * (status.TotalPhys - status.AvailPhys) / status.TotalPhys;
+        const double gb = 1024d * 1024 * 1024;
+        var used = status.TotalPhys - status.AvailPhys;
+        return (100.0 * used / status.TotalPhys, used / gb, status.AvailPhys / gb, status.TotalPhys / gb);
     }
 
     private void Close()

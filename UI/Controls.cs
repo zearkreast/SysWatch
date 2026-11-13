@@ -33,7 +33,8 @@ internal static class Draw
         TextFormatFlags flags = TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.EndEllipsis | TextFormatFlags.NoPrefix) =>
         TextRenderer.DrawText(g, s, f, r, c, flags);
 
-    public static void Sparkline(Graphics g, double[] series, RectangleF r, Color color, double? limit = null)
+    // minSpan: the smallest value range the chart stretches to, so a steady reading draws as a calm line.
+    public static void Sparkline(Graphics g, double[] series, RectangleF r, Color color, double? limit = null, double minSpan = 6)
     {
         var raw = series.Select((v, i) => (v, i)).Where(p => !double.IsNaN(p.v)).ToList();
         if (raw.Count < 2 || r.Width < 4 || r.Height < 4) return;
@@ -47,7 +48,7 @@ internal static class Draw
         }).ToList();
         var max = Math.Max(smooth.Max(p => p.v), limit ?? double.MinValue);
         var min = Math.Min(smooth.Min(p => p.v), limit ?? double.MaxValue);
-        var span = Math.Max(max - min, 6);
+        var span = Math.Max(max - min, minSpan);
         max = (max + min) / 2 + span * 0.62;
         min = max - span * 1.24;
         float X(int i) => r.X + r.Width * i / Math.Max(1, series.Length - 1);
@@ -92,6 +93,8 @@ internal static class Draw
     }
 }
 
+internal enum CardAction { MoveLeft, MoveRight, Change, Remove }
+
 internal sealed class MetricCard : Control
 {
     public string Label { get; set; } = "";
@@ -101,9 +104,21 @@ internal sealed class MetricCard : Control
     public double? Limit { get; set; }
     public bool Alarm { get; set; }
     public string Unit { get; set; } = "";
+    // Sensor type drawn as a badge before the label; empty on the built-in cards.
+    public string Badge { get; set; } = "";
+    // Formats the low/high line; without it the card uses whole numbers and Unit.
+    public Func<double, string>? RangeFormat { get; set; }
+    public double MinSpan { get; set; } = 6;
+    public bool CanMoveLeft { get; set; }
+    public bool CanMoveRight { get; set; }
+    public event Action<CardAction>? ActionClicked;
 
+    private static readonly CardAction[] Toolbar = [CardAction.MoveLeft, CardAction.MoveRight, CardAction.Change, CardAction.Remove];
     private readonly Font _value;
     private readonly Font _small;
+    private readonly ToolTip _tip = new();
+    private bool _editing;
+    private CardAction? _hover;
 
     public MetricCard(Font baseFont)
     {
@@ -112,6 +127,45 @@ internal sealed class MetricCard : Control
         _small = new Font(baseFont.FontFamily, baseFont.Size * 0.92f);
         Font = baseFont;
     }
+
+    public bool Editing
+    {
+        get => _editing;
+        set
+        {
+            if (_editing == value) return;
+            _editing = value;
+            _hover = null;
+            Cursor = value ? Cursors.Hand : Cursors.Default;
+            Invalidate();
+        }
+    }
+
+    private int Pad => (int)(Font.Height * 0.7);
+
+    // Centred along the bottom edge, over the chart, so the label and value stay readable on narrow cards.
+    private Rectangle ButtonRect(CardAction action)
+    {
+        var d = (int)(Font.Height * 1.55);
+        var total = Toolbar.Length * d + (Toolbar.Length - 1) * 4;
+        var i = Array.IndexOf(Toolbar, action);
+        return new Rectangle((Width - total) / 2 + i * (d + 4), Height - d - Pad / 2 - 3, d, d);
+    }
+
+    private bool CanDo(CardAction a) => a switch
+    {
+        CardAction.MoveLeft => CanMoveLeft,
+        CardAction.MoveRight => CanMoveRight,
+        _ => true,
+    };
+
+    private static string Tip(CardAction a) => a switch
+    {
+        CardAction.MoveLeft => L.T("Sola taşı", "Move left"),
+        CardAction.MoveRight => L.T("Sağa taşı", "Move right"),
+        CardAction.Change => L.T("Başka bir sensörle değiştir", "Change to another sensor"),
+        _ => L.T("Kaldır", "Remove"),
+    };
 
     protected override void OnPaint(PaintEventArgs e)
     {
@@ -123,8 +177,16 @@ internal sealed class MetricCard : Control
         Glass.Gloss(g, new RectangleF(0.5f, 0.5f, Width - 1.5f, Height - 1.5f), Alarm ? Theme.AlarmGloss : Theme.CardGloss, 5,
             Alarm ? Theme.AlarmBorder : Theme.Border);
 
-        var pad = (int)(Font.Height * 0.7);
-        Draw.Text(g, Label, _small, muted, new Rectangle(pad, pad - 2, Width - pad * 2, _small.Height));
+        var pad = Pad;
+        var labelRight = Width - pad;
+        var labelX = pad;
+        if (Badge.Length > 0)
+        {
+            var b = _small.Height;
+            SensorGlyphs.TypeBadge(g, Badge, new RectangleF(pad, pad - 2, b, b));
+            labelX += b + 5;
+        }
+        Draw.Text(g, Label, _small, muted, new Rectangle(labelX, pad - 2, Math.Max(0, labelRight - labelX), _small.Height));
         var valueTop = pad + _small.Height;
         const TextFormatFlags plain = TextFormatFlags.NoPadding | TextFormatFlags.NoPrefix | TextFormatFlags.SingleLine;
         var valueSize = TextRenderer.MeasureText(g, Value, _value, Size.Empty, plain);
@@ -138,15 +200,92 @@ internal sealed class MetricCard : Control
         var chart = new RectangleF(pad, valueTop + _value.Height + 4, Width - pad * 2, Height - valueTop - _value.Height - pad - 4);
         if (chart.Height > 6)
         {
-            Draw.Sparkline(g, Series, new RectangleF(chart.X, chart.Y + 2, chart.Width - 8, chart.Height - 2), Alarm ? Theme.DangerFill : Theme.Chart, Limit);
+            Draw.Sparkline(g, Series, new RectangleF(chart.X, chart.Y + 2, chart.Width - 8, chart.Height - 2), Alarm ? Theme.DangerFill : Theme.Chart, Limit, MinSpan);
             var valid = Series.Where(v => !double.IsNaN(v)).ToArray();
-            if (valid.Length > 1 && Unit.Length > 0 && Width > Font.Height * 15)
+            if (valid.Length > 1 && (Unit.Length > 0 || RangeFormat != null) && Width > Font.Height * 15 && !_editing)
             {
-                var range = L.T($"en düşük {valid.Min():0}{Unit} · en yüksek {valid.Max():0}{Unit}", $"low {valid.Min():0}{Unit} · high {valid.Max():0}{Unit}");
+                string F(double v) => RangeFormat?.Invoke(v) ?? $"{v:0}{Unit}";
+                var range = L.T($"en düşük {F(valid.Min())} · en yüksek {F(valid.Max())}", $"low {F(valid.Min())} · high {F(valid.Max())}");
                 TextRenderer.DrawText(g, range, _small, new Rectangle(pad, Height - pad - _small.Height + 4, Width - pad * 2, _small.Height), muted,
                     TextFormatFlags.Right | TextFormatFlags.NoPrefix | TextFormatFlags.EndEllipsis);
             }
         }
+
+        if (_editing) PaintEditing(g);
+    }
+
+    private void PaintEditing(Graphics g)
+    {
+        using (var dash = new Pen(Color.FromArgb(170, Theme.Accent), 1.5f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
+        using (var outline = Draw.Round(new RectangleF(2.5f, 2.5f, Width - 5.5f, Height - 5.5f), 4))
+            g.DrawPath(dash, outline);
+
+        var first = ButtonRect(Toolbar[0]);
+        var last = ButtonRect(Toolbar[^1]);
+        Glass.Gloss(g, new RectangleF(first.X - 5, first.Y - 4, last.Right - first.X + 10, first.Height + 8), Theme.CardGloss, (first.Height + 8) / 2f, Theme.Border);
+        foreach (var a in Toolbar)
+        {
+            var r = ButtonRect(a);
+            var enabled = CanDo(a);
+            var hot = enabled && _hover == a;
+            Glass.Gloss(g, r, hot ? (a == CardAction.Remove ? Theme.AlarmGloss : Theme.ButtonHoverGloss) : Theme.ButtonGloss, r.Width / 2f,
+                hot ? (a == CardAction.Remove ? Theme.AlarmBorder : Theme.SelectionBorder) : Theme.ButtonBorder);
+            var color = !enabled ? Color.FromArgb(90, Theme.TextMuted) : hot && a == CardAction.Remove ? Theme.Danger : Theme.TextSecondary;
+            using var pen = new Pen(color, 1.7f) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round, LineJoin = System.Drawing.Drawing2D.LineJoin.Round };
+            var cx = r.X + r.Width / 2f;
+            var cy = r.Y + r.Height / 2f;
+            var s = r.Width * 0.17f;
+            switch (a)
+            {
+                case CardAction.MoveLeft:
+                    g.DrawLines(pen, new[] { new PointF(cx + s * 0.5f, cy - s * 1.1f), new PointF(cx - s * 0.6f, cy), new PointF(cx + s * 0.5f, cy + s * 1.1f) });
+                    break;
+                case CardAction.MoveRight:
+                    g.DrawLines(pen, new[] { new PointF(cx - s * 0.5f, cy - s * 1.1f), new PointF(cx + s * 0.6f, cy), new PointF(cx - s * 0.5f, cy + s * 1.1f) });
+                    break;
+                case CardAction.Change:
+                    g.DrawLine(pen, cx - s * 1.2f, cy - s * 0.55f, cx + s * 1.2f, cy - s * 0.55f);
+                    g.DrawLines(pen, new[] { new PointF(cx + s * 0.55f, cy - s * 1.15f), new PointF(cx + s * 1.2f, cy - s * 0.55f), new PointF(cx + s * 0.55f, cy + s * 0.05f) });
+                    g.DrawLine(pen, cx + s * 1.2f, cy + s * 0.6f, cx - s * 1.2f, cy + s * 0.6f);
+                    g.DrawLines(pen, new[] { new PointF(cx - s * 0.55f, cy), new PointF(cx - s * 1.2f, cy + s * 0.6f), new PointF(cx - s * 0.55f, cy + s * 1.2f) });
+                    break;
+                case CardAction.Remove:
+                    g.DrawLine(pen, cx - s, cy - s, cx + s, cy + s);
+                    g.DrawLine(pen, cx + s, cy - s, cx - s, cy + s);
+                    break;
+            }
+        }
+    }
+
+    private CardAction? ActionAt(Point p)
+    {
+        foreach (var a in Toolbar)
+            if (ButtonRect(a).Contains(p)) return a;
+        return null;
+    }
+
+    protected override void OnMouseMove(MouseEventArgs e)
+    {
+        if (!_editing) return;
+        var a = ActionAt(e.Location);
+        if (a == _hover) return;
+        _hover = a;
+        _tip.SetToolTip(this, a is { } act ? Tip(act) : L.T("Değiştirmek için tıklayın", "Click to change"));
+        Invalidate();
+    }
+
+    protected override void OnMouseLeave(EventArgs e)
+    {
+        if (_hover == null) return;
+        _hover = null;
+        Invalidate();
+    }
+
+    protected override void OnMouseClick(MouseEventArgs e)
+    {
+        if (!_editing || e.Button != MouseButtons.Left) return;
+        var a = ActionAt(e.Location) ?? CardAction.Change;
+        if (CanDo(a)) ActionClicked?.Invoke(a);
     }
 
     protected override void Dispose(bool disposing)
@@ -155,9 +294,53 @@ internal sealed class MetricCard : Control
         {
             _value.Dispose();
             _small.Dispose();
+            _tip.Dispose();
         }
         base.Dispose(disposing);
     }
+}
+
+internal sealed class AddChartTile : Control
+{
+    private bool _hover;
+
+    public AddChartTile(Font font)
+    {
+        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
+        Font = font;
+        Cursor = Cursors.Hand;
+    }
+
+    protected override void OnPaint(PaintEventArgs e)
+    {
+        var g = e.Graphics;
+        Draw.Setup(g);
+        g.Clear(Draw.Backdrop(this));
+        var r = new RectangleF(1.5f, 1.5f, Width - 3.5f, Height - 3.5f);
+        if (_hover) Glass.Gloss(g, r, Theme.ButtonHoverGloss, 5, Theme.SelectionBorder);
+        using (var dash = new Pen(_hover ? Theme.Accent : Theme.SelectionBorder, 1.5f) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dash })
+        using (var outline = Draw.Round(r, 5))
+            g.DrawPath(dash, outline);
+
+        var d = Math.Min(Font.Height * 2.6f, Math.Min(Width, Height) * 0.4f);
+        var text = L.T("Grafik ekle", "Add chart");
+        var th = Font.Height;
+        var top = (Height - d - th - 8) / 2f;
+        var orb = new RectangleF((Width - d) / 2f, top, d, d);
+        Glass.Gloss(g, orb, Theme.PrimaryGloss, d / 2, Theme.ButtonBorder);
+        using (var plus = new Pen(Color.White, Math.Max(2f, d / 9)) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round })
+        {
+            var cx = orb.X + d / 2;
+            var cy = orb.Y + d / 2;
+            g.DrawLine(plus, cx - d * 0.22f, cy, cx + d * 0.22f, cy);
+            g.DrawLine(plus, cx, cy - d * 0.22f, cx, cy + d * 0.22f);
+        }
+        Draw.Text(g, text, Font, _hover ? Theme.Accent : Theme.TextSecondary, new Rectangle(0, (int)(orb.Bottom + 6), Width, th + 4),
+            TextFormatFlags.HorizontalCenter | TextFormatFlags.Top | TextFormatFlags.NoPrefix);
+    }
+
+    protected override void OnMouseEnter(EventArgs e) { _hover = true; Invalidate(); }
+    protected override void OnMouseLeave(EventArgs e) { _hover = false; Invalidate(); }
 }
 
 internal sealed class NavList : Control
@@ -467,7 +650,7 @@ internal sealed class FlatButton : Button
             using var focus = new Pen(Color.FromArgb(120, Theme.Accent)) { DashStyle = System.Drawing.Drawing2D.DashStyle.Dot };
             g.DrawRectangle(focus, 3, 3, Width - 7, Height - 7);
         }
-        var textColor = Primary ? Color.White : Theme.Text;
+        var textColor = !Enabled ? Theme.TextMuted : Primary ? Color.White : Theme.Text;
         if (Image == null)
         {
             TextRenderer.DrawText(g, Text, Font, ClientRectangle, textColor, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix);
@@ -476,7 +659,16 @@ internal sealed class FlatButton : Button
         var tw = Text.Length > 0 ? TextRenderer.MeasureText(g, Text, Font, Size.Empty, TextFormatFlags.NoPadding).Width : 0;
         var gapW = Text.Length > 0 ? 6 : 0;
         var x = (Width - Image.Width - gapW - tw) / 2;
-        g.DrawImage(Image, x, (Height - Image.Height) / 2, Image.Width, Image.Height);
+        if (Enabled)
+        {
+            g.DrawImage(Image, x, (Height - Image.Height) / 2, Image.Width, Image.Height);
+        }
+        else
+        {
+            using var faded = new System.Drawing.Imaging.ImageAttributes();
+            faded.SetColorMatrix(new System.Drawing.Imaging.ColorMatrix { Matrix33 = 0.4f });
+            g.DrawImage(Image, new Rectangle(x, (Height - Image.Height) / 2, Image.Width, Image.Height), 0, 0, Image.Width, Image.Height, GraphicsUnit.Pixel, faded);
+        }
         if (tw > 0)
             TextRenderer.DrawText(g, Text, Font, new Rectangle(x + Image.Width + gapW, 0, tw + 4, Height), textColor,
                 TextFormatFlags.Left | TextFormatFlags.VerticalCenter | TextFormatFlags.NoPrefix | TextFormatFlags.NoPadding);

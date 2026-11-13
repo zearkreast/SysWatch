@@ -77,6 +77,7 @@ public sealed class TrayApp : ApplicationContext, IUiHost
         ]);
         _router = new CommandRouter(this);
 
+        _sensors.Watch(_config.ChartSensorIds());
         _timer = new System.Threading.Timer(_ => Tick(), null, Timeout.Infinite, Timeout.Infinite);
         Task.Run(() =>
         {
@@ -404,6 +405,7 @@ public sealed class TrayApp : ApplicationContext, IUiHost
     private void Apply(AppConfig next)
     {
         _config = next;
+        _sensors.Watch(next.ChartSensorIds());
         _ui.Post(_ =>
         {
             L.Apply(next.Language);

@@ -8,6 +8,7 @@ namespace SysWatch.Monitoring;
 public sealed class MetricHistory(int capacity = 100)
 {
     private readonly Dictionary<Metric, double[]> _data = new();
+    private readonly Dictionary<string, double[]> _sensors = new();
     private readonly object _gate = new();
     private int _head;
     private int _count;
@@ -23,8 +24,32 @@ public sealed class MetricHistory(int capacity = 100)
                 if (!_data.TryGetValue(m, out var buf)) _data[m] = buf = Enumerable.Repeat(double.NaN, capacity).ToArray();
                 buf[_head] = snap.Get(m) ?? double.NaN;
             }
+            foreach (var (id, sample) in snap.Watched)
+            {
+                if (!_sensors.TryGetValue(id, out var buf)) _sensors[id] = buf = Enumerable.Repeat(double.NaN, capacity).ToArray();
+                buf[_head] = sample.Value;
+            }
+            // A sensor taken off the charts stops being read; its buffer goes once it holds nothing.
+            foreach (var id in _sensors.Keys.Where(k => !snap.Watched.ContainsKey(k)).ToList())
+            {
+                var buf = _sensors[id];
+                buf[_head] = double.NaN;
+                if (buf.All(double.IsNaN)) _sensors.Remove(id);
+            }
             _head = (_head + 1) % capacity;
             _count = Math.Min(_count + 1, capacity);
+        }
+    }
+
+    public double[] Series(string sensorId)
+    {
+        lock (_gate)
+        {
+            var result = new double[_count];
+            if (!_sensors.TryGetValue(sensorId, out var buf)) return Enumerable.Repeat(double.NaN, _count).ToArray();
+            var start = (_head - _count + capacity) % capacity;
+            for (var i = 0; i < _count; i++) result[i] = buf[(start + i) % capacity];
+            return result;
         }
     }
 

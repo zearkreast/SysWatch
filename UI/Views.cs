@@ -4,68 +4,148 @@ using SysWatch.Monitoring;
 
 namespace SysWatch.UI;
 
-// "Durum" page: four live cards with sparklines, a mute button and the last-reading note.
+// "Durum" page: the chosen cards (built-in or any sensor), a mute button and the last-reading note. "Customize" edits
+// the cards in place.
 internal sealed class DashboardView : Panel
 {
     private readonly IUiHost _app;
-    private readonly MetricCard _cpu, _gpu, _ram, _disk;
-    private readonly Label _note = new() { AutoSize = true, Tag = "muted" };
+    private readonly Panel _grid = new() { Dock = DockStyle.Fill };
+    private readonly Panel _bottom;
+    private readonly List<(string Key, MetricCard Card)> _cards = new();
+    private readonly AddChartTile _add;
+    private readonly FlatButton _customize;
+    private readonly Font _font;
+    private readonly Label _note = new() { AutoSize = false, AutoEllipsis = true, TextAlign = ContentAlignment.MiddleLeft, Tag = "muted" };
     private readonly System.Windows.Forms.Timer _refresh = new() { Interval = 1000 };
+    // Name, hardware and type of each charted sensor, so a card is labelled even before its first reading.
+    private readonly Dictionary<string, SensorSample> _meta = new();
+    private string _layoutKey = "\0";
+    private bool _editing;
 
     public DashboardView(IUiHost app, Font font, Action openDetails)
     {
         _app = app;
+        _font = font;
         Dock = DockStyle.Fill;
         var unit = font.Height;
-        var grid = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 2, RowCount = 2 };
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        grid.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 50));
-        grid.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-        grid.RowStyles.Add(new RowStyle(SizeType.Percent, 50));
-        MetricCard Card(string label)
-        {
-            var c = new MetricCard(font) { Label = label, Dock = DockStyle.Fill, Margin = new Padding(5) };
-            grid.Controls.Add(c);
-            return c;
-        }
-        _cpu = Card("CPU");
-        _gpu = Card("GPU");
-        _ram = Card("RAM");
-        _disk = Card("Disk");
+        _add = new AddChartTile(font);
+        _add.Click += (_, _) => AddChart();
+        _grid.Layout += (_, _) => LayoutCards();
+        _grid.MouseUp += (_, e) => { if (e.Button == MouseButtons.Right) ShowMenu(-1, _grid, e.Location); };
 
-        var bottom = new Panel { Dock = DockStyle.Bottom, Height = (int)(unit * 2.8) };
-        var mute = new FlatButton(L.T("Bildirimleri sustur", "Mute notifications")) { Image = Icons.Get(Icons.Mute, Icons.SizeFor(font) - 4) };
-        var details = new FlatButton(L.T("Detaylar", "Details")) { Image = Icons.Get(Icons.Details, Icons.SizeFor(font) - 4) };
+        _bottom = new Panel { Dock = DockStyle.Bottom, Height = (int)(unit * 2.8) };
+        var iconSize = Icons.SizeFor(font) - 4;
+        var mute = new FlatButton(L.T("Bildirimleri sustur", "Mute notifications")) { Image = Icons.Get(Icons.Mute, iconSize) };
+        var details = new FlatButton(L.T("Detaylar", "Details")) { Image = Icons.Get(Icons.Details, iconSize) };
+        _customize = new FlatButton(L.T("Özelleştir", "Customize")) { Image = Icons.Get(Icons.Appearance, iconSize) };
         details.Click += (_, _) => openDetails();
-        bottom.Controls.Add(_note);
-        bottom.Controls.Add(mute);
-        bottom.Controls.Add(details);
-        bottom.Layout += (_, _) =>
+        _customize.Click += (_, _) => SetEditing(!_editing);
+        _bottom.Controls.Add(_note);
+        _bottom.Controls.Add(mute);
+        _bottom.Controls.Add(details);
+        _bottom.Controls.Add(_customize);
+        _bottom.Layout += (_, _) =>
         {
-            mute.Location = new Point(bottom.Width - mute.Width - 5, (bottom.Height - mute.Height) / 2);
+            mute.Location = new Point(_bottom.Width - mute.Width - 5, (_bottom.Height - mute.Height) / 2);
             details.Location = new Point(mute.Left - details.Width - 6, mute.Top);
-            _note.Location = new Point(6, (bottom.Height - _note.Height) / 2);
+            _customize.Location = new Point(details.Left - _customize.Width - 6, mute.Top);
+            _note.Bounds = new Rectangle(6, 0, Math.Max(0, _customize.Left - 14), _bottom.Height);
         };
         mute.Click += (_, _) => ShowMuteMenu(mute);
 
-        Controls.Add(grid);
-        Controls.Add(bottom);
+        Controls.Add(_grid);
+        Controls.Add(_bottom);
         _refresh.Tick += (_, _) => RefreshValues();
         VisibleChanged += (_, _) =>
         {
             if (Visible) { RefreshValues(); _refresh.Start(); }
-            else _refresh.Stop();
+            else { _refresh.Stop(); SetEditing(false); }
         };
     }
 
+    private List<string> Charts => _app.Config.Charts;
+
+    private void SetEditing(bool on)
+    {
+        if (_editing == on) return;
+        _editing = on;
+        _customize.Text = on ? L.T("Bitti", "Done") : L.T("Özelleştir", "Customize");
+        _customize.Primary = on;
+        _customize.Invalidate();
+        _bottom.PerformLayout();
+        Rebuild();
+    }
+
+    private void Rebuild()
+    {
+        var keys = Charts.ToList();
+        _grid.SuspendLayout();
+        foreach (var (_, card) in _cards)
+        {
+            _grid.Controls.Remove(card);
+            card.Dispose();
+        }
+        _cards.Clear();
+        _grid.Controls.Remove(_add);
+
+        var missing = keys.Select(SensorId).OfType<string>().Where(id => !_meta.ContainsKey(id)).ToList();
+        if (missing.Count > 0)
+            foreach (var grp in _app.Sensors())
+                foreach (var item in grp.Items.Where(i => missing.Contains(i.Id)))
+                    _meta[item.Id] = new SensorSample(item.Name, grp.Name, item.Type, double.NaN);
+
+        for (var i = 0; i < keys.Count; i++)
+        {
+            var index = i;
+            var card = new MetricCard(_font) { Editing = _editing };
+            card.ActionClicked += a => OnCardAction(index, a);
+            card.MouseUp += (_, e) => { if (e.Button == MouseButtons.Right) ShowMenu(index, card, e.Location); };
+            _cards.Add((keys[i], card));
+            _grid.Controls.Add(card);
+        }
+        if (ShowAddTile) _grid.Controls.Add(_add);
+        _layoutKey = string.Join("\n", keys);
+        _grid.ResumeLayout();
+        LayoutCards();
+        Fill();
+    }
+
+    private bool ShowAddTile => _cards.Count < AppConfig.MaxCharts && (_editing || _cards.Count == 0);
+
+    private static string? SensorId(string key) =>
+        key.StartsWith(AppConfig.SensorChartPrefix, StringComparison.Ordinal) ? key[AppConfig.SensorChartPrefix.Length..] : null;
+
+    private void LayoutCards()
+    {
+        var cells = _cards.Select(c => (Control)c.Card).ToList();
+        if (ShowAddTile) cells.Add(_add);
+        if (cells.Count == 0) return;
+        var cols = cells.Count <= 1 ? 1 : cells.Count <= 4 ? 2 : 3;
+        var rows = (cells.Count + cols - 1) / cols;
+        var w = _grid.ClientSize.Width / (float)cols;
+        var h = _grid.ClientSize.Height / (float)rows;
+        for (var i = 0; i < cells.Count; i++)
+        {
+            var x = (int)(i % cols * w);
+            var y = (int)(i / cols * h);
+            cells[i].Bounds = new Rectangle(x + 5, y + 5, (int)((i % cols + 1) * w) - x - 10, (int)((i / cols + 1) * h) - y - 10);
+        }
+    }
+
     public void RefreshValues()
+    {
+        if (string.Join("\n", Charts) != _layoutKey) Rebuild();
+        else Fill();
+    }
+
+    private void Fill()
     {
         var snap = _app.LastSnapshot;
         var active = _app.ActiveAlerts;
         var cfg = _app.Config;
         var hist = _app.History;
 
-        void Fill(MetricCard card, string label, Metric main, Metric? secondary)
+        void FillBuiltIn(MetricCard card, string label, Metric main, Metric? secondary)
         {
             var v = snap?.Get(main);
             var s = secondary is { } sm ? snap?.Get(sm) : null;
@@ -80,17 +160,132 @@ internal sealed class DashboardView : Panel
             card.Alarm = active.Contains(main) || (secondary is { } sec && active.Contains(sec));
             card.Limit = card.Alarm && rule.Enabled ? rule.Limit : null;
             card.Label = card.Alarm && rule.Enabled ? L.T($"{label} · eşik {MetricInfo.Format(metric, rule.Limit)}", $"{label} · threshold {MetricInfo.Format(metric, rule.Limit)}") : label;
+        }
+
+        void FillSensor(MetricCard card, string id)
+        {
+            var sample = snap?.Watched.GetValueOrDefault(id);
+            if (sample != null) _meta[id] = sample;
+            var meta = _meta.GetValueOrDefault(id);
+            var type = meta?.Type ?? "";
+            card.Badge = type;
+            card.Label = meta == null ? L.T("Sensör bulunamadı", "Sensor not found") : $"{meta.Name} · {meta.Hardware}";
+            card.Value = sample == null ? "—" : SensorFormat.Format(type, sample.Value);
+            card.Sub = "";
+            card.Unit = "";
+            card.RangeFormat = v => SensorFormat.Format(type, v);
+            card.MinSpan = MinSpan(type);
+            card.Series = hist.Series(id);
+            card.Alarm = false;
+            card.Limit = null;
+        }
+
+        for (var i = 0; i < _cards.Count; i++)
+        {
+            var (key, card) = _cards[i];
+            switch (key)
+            {
+                case "cpu": FillBuiltIn(card, "CPU", Metric.CpuTemp, Metric.CpuLoad); break;
+                case "gpu": FillBuiltIn(card, "GPU", Metric.GpuTemp, Metric.GpuLoad); break;
+                case "ram": FillBuiltIn(card, "RAM", Metric.Ram, null); break;
+                case "disk": FillBuiltIn(card, "Disk", Metric.DiskTemp, null); break;
+                default:
+                    if (SensorId(key) is { } id) FillSensor(card, id);
+                    break;
+            }
+            card.CanMoveLeft = i > 0;
+            card.CanMoveRight = i < _cards.Count - 1;
             card.Invalidate();
         }
 
-        Fill(_cpu, "CPU", Metric.CpuTemp, Metric.CpuLoad);
-        Fill(_gpu, "GPU", Metric.GpuTemp, Metric.GpuLoad);
-        Fill(_ram, "RAM", Metric.Ram, null);
-        Fill(_disk, "Disk", Metric.DiskTemp, null);
+        _note.Text = _editing
+            ? L.T("Kartları taşıyın, değiştirin ya da kaldırın.", "Move, change or remove the cards.")
+            : snap?.Get(Metric.CpuTemp) == null && cfg.Hardware.Cpu && Charts.Contains("cpu")
+                ? L.T("CPU sıcaklığı için PawnIO sürücüsü gerekli", "CPU temperature needs the PawnIO driver")
+                : snap == null ? L.T("İlk ölçüm bekleniyor…", "Waiting for the first reading…") : L.T($"Son ölçüm {snap.Time:HH:mm:ss}", $"Last reading {snap.Time:HH:mm:ss}");
+    }
 
-        _note.Text = snap?.Get(Metric.CpuTemp) == null && cfg.Hardware.Cpu
-            ? L.T("CPU sıcaklığı için PawnIO sürücüsü gerekli", "CPU temperature needs the PawnIO driver")
-            : snap == null ? L.T("İlk ölçüm bekleniyor…", "Waiting for the first reading…") : L.T($"Son ölçüm {snap.Time:HH:mm:ss}", $"Last reading {snap.Time:HH:mm:ss}");
+    // The smallest range a chart stretches to, in the sensor's own unit (throughput is in bytes per second).
+    private static double MinSpan(string type) => type switch
+    {
+        "Temperature" or "Load" or "Control" or "Level" => 6,
+        "Clock" => 200,
+        "Power" => 2,
+        "Voltage" => 0.05,
+        "Current" => 0.5,
+        "Fan" => 300,
+        "Data" => 0.5,
+        "SmallData" => 64,
+        "Throughput" => 100 * 1024,
+        _ => 1,
+    };
+
+    private void SetCharts(List<string> charts)
+    {
+        _app.UpdateConfig(c => c.Charts = charts);
+        RefreshValues();
+    }
+
+    private void OnCardAction(int index, CardAction action)
+    {
+        var list = Charts.ToList();
+        if (index >= list.Count) return;
+        switch (action)
+        {
+            case CardAction.MoveLeft when index > 0:
+                (list[index - 1], list[index]) = (list[index], list[index - 1]);
+                break;
+            case CardAction.MoveRight when index < list.Count - 1:
+                (list[index + 1], list[index]) = (list[index], list[index + 1]);
+                break;
+            case CardAction.Remove:
+                list.RemoveAt(index);
+                break;
+            case CardAction.Change:
+                if (Pick(list, list[index]) is not { } chosen) return;
+                list[index] = chosen;
+                break;
+            default:
+                return;
+        }
+        SetCharts(list);
+    }
+
+    private void AddChart()
+    {
+        var list = Charts.ToList();
+        if (list.Count >= AppConfig.MaxCharts || Pick(list, null) is not { } chosen) return;
+        list.Add(chosen);
+        SetCharts(list);
+    }
+
+    private string? Pick(List<string> taken, string? current)
+    {
+        using var picker = new ChartPicker(_app, taken, current);
+        if (picker.ShowDialog(FindForm()) != DialogResult.OK || picker.Chosen == null) return null;
+        if (picker.ChosenSensor != null && SensorId(picker.Chosen) is { } id) _meta[id] = picker.ChosenSensor;
+        return picker.Chosen;
+    }
+
+    private void ShowMenu(int index, Control anchor, Point at)
+    {
+        var menu = new ContextMenuStrip();
+        var count = Charts.Count;
+        if (index >= 0)
+        {
+            menu.Items.Add(L.T("Değiştir…", "Change…"), null, (_, _) => OnCardAction(index, CardAction.Change));
+            menu.Items.Add(L.T("Sola taşı", "Move left"), null, (_, _) => OnCardAction(index, CardAction.MoveLeft)).Enabled = index > 0;
+            menu.Items.Add(L.T("Sağa taşı", "Move right"), null, (_, _) => OnCardAction(index, CardAction.MoveRight)).Enabled = index < count - 1;
+            menu.Items.Add(L.T("Kaldır", "Remove"), null, (_, _) => OnCardAction(index, CardAction.Remove));
+            menu.Items.Add(new ToolStripSeparator());
+        }
+        menu.Items.Add(L.T("Grafik ekle…", "Add chart…"), null, (_, _) => AddChart()).Enabled = count < AppConfig.MaxCharts;
+        menu.Items.Add(_editing ? L.T("Düzenlemeyi bitir", "Finish editing") : L.T("Kartları düzenle", "Edit cards"), null, (_, _) => SetEditing(!_editing));
+        menu.Items.Add(L.T("Varsayılan kartlara dön", "Back to the default cards"), null, (_, _) => SetCharts(AppConfig.DefaultCharts()))
+            .Enabled = !Charts.SequenceEqual(AppConfig.DefaultCharts());
+        Theme.StyleMenu(menu);
+        menu.Closed += (_, _) => BeginInvoke(menu.Dispose);
+        menu.Show(anchor, at);
     }
 
     private void ShowMuteMenu(Control anchor)
@@ -326,30 +521,37 @@ internal sealed class EventList : ScrollableControl
     }
 }
 
-// "Detaylar": every sensor of every enabled group, refreshed while visible, plus the groups switched off in the
-// settings with a link to the hardware page instead of a switch here.
+// "Detaylar": every sensor of every enabled group as a tree, refreshed while visible, plus the groups switched off in
+// the settings with a link to the hardware page instead of a switch here.
 internal sealed class DetailsView : Panel
 {
     private readonly IUiHost _app;
-    private readonly SensorList _list;
+    private readonly SensorTree _tree;
     private readonly System.Windows.Forms.Timer _refresh = new() { Interval = 2000 };
 
     public DetailsView(IUiHost app, Font font, Action back, Action openHardware)
     {
         _app = app;
         Dock = DockStyle.Fill;
-        _list = new SensorList(font, openHardware) { Dock = DockStyle.Fill };
-        var header = new FlowLayoutPanel { Dock = DockStyle.Top, AutoSize = true, WrapContents = false, Padding = new Padding(0, 0, 0, 6) };
-        var backLink = new LinkLabel { Text = L.T("‹ Durum", "‹ Status"), AutoSize = true, Margin = new Padding(0, 8, 12, 0) };
+        _tree = new SensorTree(font, openHardware) { Dock = DockStyle.Fill };
+        var header = new Panel { Dock = DockStyle.Top, Height = (int)(font.Height * 2.9) };
+        var backLink = new LinkLabel { Text = L.T("‹ Durum", "‹ Status"), AutoSize = true };
         backLink.LinkClicked += (_, _) => back();
-        var title = new Label
-        {
-            Text = L.T("Tüm okumalar", "All readings"), AutoSize = true,
-            Font = new Font(font.FontFamily, font.Size * 1.35f), Margin = new Padding(0, 0, 0, 0),
-        };
+        var title = new Label { Text = L.T("Tüm okumalar", "All readings"), AutoSize = true, Font = new Font(font.FontFamily, font.Size * 1.35f) };
+        var search = SearchBox(font);
+        search.TextChanged += (_, _) => _tree.Filter = search.Text;
         header.Controls.Add(backLink);
         header.Controls.Add(title);
-        Controls.Add(_list);
+        header.Controls.Add(search);
+        header.Layout += (_, _) =>
+        {
+            var cy = (header.Height - 6) / 2;
+            backLink.Location = new Point(0, cy - backLink.Height / 2);
+            title.Location = new Point(backLink.Right + 12, cy - title.Height / 2);
+            search.Width = Math.Min((int)(font.Height * 14), Math.Max(font.Height * 6, header.Width - title.Right - 16));
+            search.Location = new Point(header.Width - search.Width - 2, cy - search.Height / 2);
+        };
+        Controls.Add(_tree);
         Controls.Add(header);
         _refresh.Tick += (_, _) => Reload();
         VisibleChanged += (_, _) =>
@@ -358,6 +560,16 @@ internal sealed class DetailsView : Panel
             else _refresh.Stop();
         };
     }
+
+    public static TextBox SearchBox(Font font)
+    {
+        var box = new TextBox { Font = font, BorderStyle = BorderStyle.FixedSingle };
+        box.HandleCreated += (_, _) => SendMessage(box.Handle, 0x1501, 1, L.T("Sensör ara…", "Search sensors…")); // EM_SETCUEBANNER
+        return box;
+    }
+
+    [System.Runtime.InteropServices.DllImport("user32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, int wParam, string lParam);
 
     private void Reload()
     {
@@ -373,7 +585,7 @@ internal sealed class DetailsView : Panel
         if (!hw.Controller) off.Add((L.T("Fan kontrolcüleri", "Fan controllers"), Icons.Board));
         if (!hw.Network) off.Add((L.T("Ağ bağdaştırıcıları", "Network adapters"), Icons.Network));
         if (!hw.Psu) off.Add((L.T("Güç kaynağı (PSU)", "Power supply (PSU)"), Icons.Power));
-        _list.SetData(_app.Sensors(), off);
+        _tree.SetData(_app.Sensors(), off);
     }
 
     protected override void Dispose(bool disposing)
@@ -382,175 +594,3 @@ internal sealed class DetailsView : Panel
         base.Dispose(disposing);
     }
 }
-
-internal sealed class SensorList : ScrollableControl
-{
-    private enum RowKind { Group, Item, OffHeader, Off }
-
-    private sealed record Row(RowKind Kind, string Text, string Kind2 = "", string Value = "", string Icon = "");
-
-    private readonly List<Row> _rows = new();
-    private readonly Font _bold, _small;
-    private readonly Action _openHardware;
-    private int _hoverLink = -1;
-
-    private int RowHeight(Row r) => r.Kind switch
-    {
-        RowKind.Group => (int)(Font.Height * 2.4),
-        RowKind.OffHeader => (int)(Font.Height * 2.8),
-        RowKind.Off => (int)(Font.Height * 2.0),
-        _ => (int)(Font.Height * 1.55),
-    };
-
-    public SensorList(Font font, Action openHardware)
-    {
-        SetStyle(ControlStyles.AllPaintingInWmPaint | ControlStyles.OptimizedDoubleBuffer | ControlStyles.UserPaint | ControlStyles.ResizeRedraw, true);
-        Font = font;
-        _bold = new Font(font, FontStyle.Bold);
-        _small = new Font(font.FontFamily, font.Size * 0.92f);
-        _openHardware = openHardware;
-        AutoScroll = true;
-    }
-
-    public void SetData(List<SensorGroup> groups, List<(string Name, string Icon)> off)
-    {
-        _rows.Clear();
-        foreach (var grp in groups)
-        {
-            _rows.Add(new Row(RowKind.Group, grp.Name, Icon: IconFor(grp.Category)));
-            foreach (var item in grp.Items) _rows.Add(new Row(RowKind.Item, item.Name, item.Kind, item.Value));
-        }
-        if (off.Count > 0)
-        {
-            _rows.Add(new Row(RowKind.OffHeader, L.T("Ayarlarda kapalı olan sensör grupları", "Sensor groups switched off in settings")));
-            foreach (var (name, icon) in off) _rows.Add(new Row(RowKind.Off, name, Icon: icon));
-        }
-        AutoScrollMinSize = new Size(0, _rows.Sum(RowHeight) + 12);
-        Invalidate();
-    }
-
-    private static string IconFor(string category) => category switch
-    {
-        "Cpu" => Icons.Hardware,
-        "GpuNvidia" or "GpuAmd" or "GpuIntel" or "Gpu" => Icons.Gpu,
-        "Storage" => Icons.Disk,
-        "Memory" => Icons.Memory,
-        "Motherboard" or "SuperIO" or "EmbeddedController" or "Cooler" => Icons.Board,
-        "Network" => Icons.Network,
-        "Psu" or "Battery" => Icons.Power,
-        _ => Icons.Hardware,
-    };
-
-    private Rectangle LinkRect(Rectangle row)
-    {
-        var w = TextRenderer.MeasureText(L.T("Donanım ayarlarında aç ›", "Turn on in Hardware settings ›"), Font).Width;
-        return new Rectangle(row.Right - w - 10, row.Y, w, row.Height);
-    }
-
-    protected override void OnPaint(PaintEventArgs e)
-    {
-        var g = e.Graphics;
-        Draw.Setup(g);
-        g.Clear(Draw.Backdrop(this));
-        var y = 4 + AutoScrollPosition.Y;
-        var w = Width - (VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0) - 8;
-        var zebra = false;
-        for (var i = 0; i < _rows.Count; i++)
-        {
-            var row = _rows[i];
-            var h = RowHeight(row);
-            var r = new Rectangle(4, y, w, h);
-            if (y + h >= 0 && y <= Height)
-            {
-                switch (row.Kind)
-                {
-                    case RowKind.Group:
-                        var groupRect = new Rectangle(r.X, r.Y + 6, r.Width, r.Height - 8);
-                        Glass.Gloss(g, groupRect, Theme.CardGloss, 4, Theme.Border);
-                        var isz = Math.Min(24, groupRect.Height - 6);
-                        g.DrawImage(Icons.Get(row.Icon, isz), groupRect.X + 8, groupRect.Y + (groupRect.Height - isz) / 2);
-                        Draw.Text(g, row.Text, _bold, Theme.Text, new Rectangle(groupRect.X + isz + 16, groupRect.Y, groupRect.Width - isz - 24, groupRect.Height));
-                        zebra = false;
-                        break;
-                    case RowKind.Item:
-                        if (zebra)
-                        {
-                            using var z = new SolidBrush(Color.FromArgb(Theme.Dark ? 18 : 120, Theme.SelectionGloss[0]));
-                            g.FillRectangle(z, r.X + 2, r.Y, r.Width - 4, r.Height);
-                        }
-                        zebra = !zebra;
-                        var valueW = TextRenderer.MeasureText(row.Value, _bold).Width;
-                        Draw.Text(g, row.Text, Font, Theme.Text, new Rectangle(r.X + 20, r.Y, r.Width - valueW - 150, r.Height));
-                        Draw.Text(g, row.Kind2, _small, Theme.TextMuted, new Rectangle(r.Right - valueW - 130, r.Y, 110, r.Height), TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
-                        Draw.Text(g, row.Value, _bold, Theme.Text, new Rectangle(r.Right - valueW - 10, r.Y, valueW + 4, r.Height), TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
-                        break;
-                    case RowKind.OffHeader:
-                        Draw.Text(g, row.Text, _bold, Theme.TextSecondary, new Rectangle(r.X + 4, r.Y + r.Height / 3, r.Width, r.Height * 2 / 3));
-                        break;
-                    case RowKind.Off:
-                        var osz = Math.Min(20, r.Height - 8);
-                        using (var attrs = new System.Drawing.Imaging.ImageAttributes())
-                        {
-                            attrs.SetColorMatrix(new System.Drawing.Imaging.ColorMatrix { Matrix33 = 0.45f });
-                            var img = Icons.Get(row.Icon, osz);
-                            g.DrawImage(img, new Rectangle(r.X + 10, r.Y + (r.Height - osz) / 2, osz, osz), 0, 0, osz, osz, GraphicsUnit.Pixel, attrs);
-                        }
-                        Draw.Text(g, row.Text, Font, Theme.TextMuted, new Rectangle(r.X + osz + 18, r.Y, r.Width - osz - 200, r.Height));
-                        var link = LinkRect(r);
-                        using (var lf = new Font(Font, i == _hoverLink ? FontStyle.Underline : FontStyle.Regular))
-                            Draw.Text(g, L.T("Donanım ayarlarında aç ›", "Turn on in Hardware settings ›"), lf, Theme.Accent, link, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
-                        break;
-                }
-            }
-            y += h;
-        }
-    }
-
-    private int LinkAt(Point p)
-    {
-        var y = 4 + AutoScrollPosition.Y;
-        var w = Width - (VerticalScroll.Visible ? SystemInformation.VerticalScrollBarWidth : 0) - 8;
-        for (var i = 0; i < _rows.Count; i++)
-        {
-            var h = RowHeight(_rows[i]);
-            if (_rows[i].Kind == RowKind.Off && LinkRect(new Rectangle(4, y, w, h)).Contains(p)) return i;
-            y += h;
-        }
-        return -1;
-    }
-
-    protected override void OnMouseMove(MouseEventArgs e)
-    {
-        var i = LinkAt(e.Location);
-        Cursor = i >= 0 ? Cursors.Hand : Cursors.Default;
-        if (i != _hoverLink) { _hoverLink = i; Invalidate(); }
-    }
-
-    protected override void OnMouseClick(MouseEventArgs e)
-    {
-        if (LinkAt(e.Location) >= 0) _openHardware();
-    }
-
-    protected override void OnScroll(ScrollEventArgs se)
-    {
-        base.OnScroll(se);
-        Invalidate();
-    }
-
-    protected override void OnMouseWheel(MouseEventArgs e)
-    {
-        base.OnMouseWheel(e);
-        Invalidate();
-    }
-
-    protected override void Dispose(bool disposing)
-    {
-        if (disposing)
-        {
-            _bold.Dispose();
-            _small.Dispose();
-        }
-        base.Dispose(disposing);
-    }
-}
-

@@ -105,6 +105,8 @@ public sealed class AppConfig
     public int IntervalSeconds { get; set; } = 3;
     public bool IncludeHostname { get; set; } = true;
     public List<Metric> TrayReadings { get; set; } = [];
+    // Status page cards in order: "cpu", "gpu", "ram", "disk", or "sensor:" + a SensorItem.Id.
+    public List<string> Charts { get; set; } = DefaultCharts();
     // Hex colour for the tray numbers; empty follows the taskbar (light/dark).
     public string TrayNumberColor { get; set; } = "";
     public UiTheme UiTheme { get; set; } = UiTheme.Light;
@@ -139,6 +141,14 @@ public sealed class AppConfig
         new() { Metric = Metric.Ram, Limit = 90, Hysteresis = 5 },
         new() { Metric = Metric.DiskTemp, Limit = 70, Hysteresis = 3 },
     ];
+
+    public const int MaxCharts = 9;
+    public const string SensorChartPrefix = "sensor:";
+
+    public static List<string> DefaultCharts() => ["cpu", "gpu", "ram", "disk"];
+
+    public IEnumerable<string> ChartSensorIds() =>
+        Charts.Where(c => c.StartsWith(SensorChartPrefix, StringComparison.Ordinal)).Select(c => c[SensorChartPrefix.Length..]);
 
     public Rule RuleFor(Metric metric)
     {
@@ -187,6 +197,7 @@ public sealed class AppConfig
     private void Normalize()
     {
         IntervalSeconds = Math.Clamp(IntervalSeconds, 1, 60);
+        Charts = (Charts ?? DefaultCharts()).Where(c => !string.IsNullOrWhiteSpace(c)).Distinct().Take(MaxCharts).ToList();
         foreach (var metric in Enum.GetValues<Metric>()) RuleFor(metric);
         Rules = Rules.GroupBy(r => r.Metric).Select(g => g.First()).OrderBy(r => r.Metric).ToList();
         foreach (var r in Rules)
