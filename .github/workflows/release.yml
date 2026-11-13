@@ -1,19 +1,22 @@
-# Builds the SysWatch installer and portable zip and publishes them as release v<version>.
+# Builds the SysWatch installer and portable zip and publishes them as release v<version> when a v* tag is
+# pushed. Nothing runs on ordinary pushes.
 #
-#   * The version is the <Version> in SysWatch.csproj, and the release notes are docs/releases/<version>.md
-#     (Turkish list, then "## English" and the English list). Both must be in place before the run.
-#   * A version is released once: if the tag v<version> already exists the run stops before building.
+#   * The tag must match <Version> in SysWatch.csproj and point at a commit on main, and that commit must hold
+#     the release notes docs/releases/<version>.md (Turkish list, then "## English" and the English list).
+#   * A version is released once: if release v<version> already exists the run stops before building.
 #   * The installer is installed and uninstalled silently on the runner before anything is published, so a
 #     broken installer never reaches the release page.
 #   * Files keep fixed names (SysWatch_x64-setup.exe, SysWatch_x64-portable.zip), so the README's
 #     releases/latest/download links always point at the newest version.
 #
-# Run it from the Actions tab: Release -> Run workflow (default branch only).
+# To release: raise <Version>, add the notes, push to main, then `git tag v<version>` and `git push origin v<version>`.
+# A failed run can be repeated from its page in the Actions tab (Re-run jobs).
 
 name: Release
 
 on:
-  workflow_dispatch:
+  push:
+    tags: ['v*']
 
 permissions:
   contents: read
@@ -26,13 +29,14 @@ jobs:
   build:
     name: Build and test (Windows x64)
     runs-on: windows-latest
-    if: github.ref_name == github.event.repository.default_branch
     outputs:
       version: ${{ steps.version.outputs.version }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Read the version
         id: version
@@ -40,8 +44,11 @@ jobs:
         run: |
           $version = ([xml](Get-Content SysWatch.csproj)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
           if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "Unexpected <Version> '$version' in SysWatch.csproj." }
+          if ('${{ github.ref_name }}' -ne "v$version") { throw "Tag ${{ github.ref_name }} does not match <Version> $version in SysWatch.csproj." }
           if (-not (Test-Path "docs/releases/$version.md")) { throw "docs/releases/$version.md is missing." }
-          gh api "repos/${{ github.repository }}/git/ref/tags/v$version" 2>$null | Out-Null
+          git merge-base --is-ancestor HEAD origin/main
+          if ($LASTEXITCODE -ne 0) { throw "${{ github.ref_name }} points at a commit that is not on main." }
+          gh release view "v$version" --repo "${{ github.repository }}" 2>$null | Out-Null
           if ($LASTEXITCODE -eq 0) { throw "v$version is already released. Raise <Version> in SysWatch.csproj first." }
           "version=$version" >> $env:GITHUB_OUTPUT
           Write-Host "SysWatch $version"
@@ -136,7 +143,6 @@ jobs:
       - name: Create the release
         run: |
           gh release create "v$VERSION" release/* \
-            --target "$GITHUB_SHA" \
             --title "SysWatch $VERSION" \
             --notes-file "$RUNNER_TEMP/notes.md" \
             --latest

@@ -184,7 +184,12 @@ The release files (installer and portable zip) go to `dist\`. The installer need
 .\scripts\build-release.ps1
 ```
 
-Releases are published by the **Release** workflow in GitHub Actions (Actions > Release > Run workflow). It takes the version from `<Version>` in `SysWatch.csproj` and the release notes from `docs/releases/<version>.md`.
+Releases are published by the **Release** workflow in GitHub Actions, which runs only when a version tag is pushed. Raise `<Version>` in `SysWatch.csproj`, add `docs/releases/<version>.md`, push to `main`, then tag that commit:
+
+```powershell
+git tag v1.1.0
+git push origin v1.1.0
+```
 
 ## License
 

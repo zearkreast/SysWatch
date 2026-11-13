@@ -183,7 +183,12 @@ Yayın dosyaları (kurulum ve taşınabilir zip) `dist\` klasörüne çıkar. Ku
 .\scripts\build-release.ps1
 ```
 
-Sürümler GitHub Actions'taki **Release** iş akışıyla yayınlanır (Actions > Release > Run workflow). Sürüm numarası `SysWatch.csproj` içindeki `<Version>`'dan, sürüm notları `docs/releases/<sürüm>.md`'den okunur.
+Sürümler GitHub Actions'taki **Release** iş akışıyla yayınlanır; iş akışı yalnızca bir sürüm etiketi push'lanınca çalışır. `SysWatch.csproj` içindeki `<Version>`'ı yükseltin, `docs/releases/<sürüm>.md` notlarını ekleyin, `main`'e push'layın, sonra o commit'i etiketleyin:
+
+```powershell
+git tag v1.1.0
+git push origin v1.1.0
+```
 
 ## Lisans
 
