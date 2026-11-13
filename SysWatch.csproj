@@ -1,0 +1,48 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>Assets\syswatch.ico</ApplicationIcon>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>false</SelfContained>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Version>1.0.0</Version>
+    <Product>SysWatch</Product>
+    <Authors>zearkreast</Authors>
+    <Company>zearkreast</Company>
+    <Copyright>Copyright © 2026 zearkreast</Copyright>
+    <Description>Sıcaklık ve yük eşiklerini izleyip Windows, Telegram, Discord, e-posta ve Signal ile haber veren hafif tepsi uygulaması.</Description>
+    <RepositoryUrl>https://github.com/zearkreast/SysWatch</RepositoryUrl>
+    <!-- Release builds go to dist/ (see scripts/build-release.ps1); keep their generated sources out of the build. -->
+    <DefaultItemExcludes>$(DefaultItemExcludes);dist/**</DefaultItemExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\syswatch.ico" LogicalName="SysWatch.syswatch.ico" />
+    <EmbeddedResource Include="Assets\Icons\*.png" LogicalName="SysWatch.Icons.%(Filename).png" />
+    <EmbeddedResource Include="Assets\Brands\*.svg" LogicalName="SysWatch.Brands.%(Filename).svg" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BouncyCastle.Cryptography" Version="2.7.0" />
+    <PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+    <PackageReference Include="MailKit" Version="5.0.0" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+
+  <!-- Mono.Posix's native helpers serve HidSharp on Linux only; Windows never loads them. -->
+  <Target Name="DropMonoPosixNatives" AfterTargets="ComputeResolvedFilesToPublishList">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)" Condition="'%(Filename)' == 'MonoPosixHelper' Or '%(Filename)' == 'libMonoPosixHelper'" />
+    </ItemGroup>
+  </Target>
+
+</Project>

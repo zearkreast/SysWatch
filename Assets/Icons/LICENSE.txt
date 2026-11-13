@@ -1,0 +1,5 @@
+These icons come from the Tango Desktop Project icon theme (tango.freedesktop.org),
+taken from the mirror https://github.com/Distrotech/tango-icon-theme (32x32 PNGs).
+
+The theme's COPYING file states:
+"The icons in this repository are herefore released into the Public Domain."

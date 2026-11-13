@@ -1,0 +1,19 @@
+# Build output
+bin/
+obj/
+dist/
+publish/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+
+# Portable runs and diagnostics write here
+data/
+diag.txt
+*.log
+
+# Local tooling notes
+CLAUDE.md
+.claude/

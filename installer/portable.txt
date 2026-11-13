@@ -1,0 +1,25 @@
+﻿SysWatch taşınabilir sürüm
+
+Bu dosya SysWatch.exe ile aynı klasörde durduğu sürece ayarlar, geçmiş ve günlük
+bu klasördeki "data" alt klasörüne yazılır; bilgisayarda başka bir iz bırakılmaz.
+Dosyayı silerseniz SysWatch kurulu sürüm gibi %APPDATA%\SysWatch klasörünü kullanır.
+
+Gereken: .NET 8 Masaüstü Çalışma Zamanı (x64). Kurulu değilse SysWatch ilk açılışta
+indirme sayfasını gösterir: https://dotnet.microsoft.com/download/dotnet/8.0
+
+Not: Bot tokenları ve parolalar Windows'un DPAPI'siyle bu kullanıcıya ve bu bilgisayara
+bağlı olarak şifrelenir. Klasörü başka bir bilgisayara taşırsanız bunları yeniden girmeniz
+gerekir; diğer ayarlar korunur.
+
+"Windows açılınca başlat" seçeneği bir Görev Zamanlayıcı görevi oluşturur. Klasörü
+taşımadan ya da silmeden önce bu seçeneği kapatın.
+
+---
+
+SysWatch portable edition
+
+While this file sits next to SysWatch.exe, settings, history and the log are kept in the
+"data" folder here and nothing else is written to the computer. Requires the .NET 8
+Desktop Runtime (x64). Secrets are encrypted with DPAPI for this user on this PC, so they
+must be entered again after moving the folder to another computer. Turn off "start with
+Windows" before moving or deleting the folder.

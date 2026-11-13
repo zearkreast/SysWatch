@@ -1,0 +1,21 @@
+# Compiles every push and pull request, so a broken build is seen before a release is attempted.
+
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 8.0.x
+      - run: dotnet build SysWatch.csproj -c Release -warnaserror

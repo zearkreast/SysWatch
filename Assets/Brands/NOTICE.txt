@@ -1,0 +1,8 @@
+discord.svg, telegram.svg, signal.svg are from Simple Icons (https://simpleicons.org,
+https://github.com/simple-icons/simple-icons), released under CC0-1.0.
+
+The logos themselves are trademarks of Discord Inc., Telegram FZ-LLC and Signal Technology
+Foundation. SysWatch shows them unmodified (white, on the brand's own colour) only to label the
+matching notification channel, as the brands' guidelines allow:
+  Discord  https://discord.com/branding
+  Signal   https://signal.org/brand
