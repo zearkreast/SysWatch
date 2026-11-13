@@ -97,7 +97,9 @@ jobs:
           $cfg = Get-Content $config -Raw | ConvertFrom-Json
           $cfg.AutoUpdate = $true
           $cfg | ConvertTo-Json -Depth 10 | Set-Content $config -Encoding utf8
-          $p = Start-Process dist/SysWatch_x64-setup.exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/UPDATE=1', "/LOG=$env:RUNNER_TEMP\update.log" -Wait -PassThru
+          $p = Start-Process dist/SysWatch_x64-setup.exe -ArgumentList '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', '/UPDATE=1', "/LOG=$env:RUNNER_TEMP\update.log" -PassThru
+          # Not -Wait: it would also wait for the SysWatch the update reopens.
+          $p.WaitForExit()
           if ($p.ExitCode -ne 0) { Get-Content "$env:RUNNER_TEMP\update.log"; throw "The silent update exited with $($p.ExitCode)." }
           for ($i = 0; $i -lt 20 -and -not (Get-Process SysWatch -ErrorAction SilentlyContinue); $i++) { Start-Sleep -Milliseconds 500 }
           if (-not (Get-Process SysWatch -ErrorAction SilentlyContinue)) { Get-Content "$env:RUNNER_TEMP\update.log"; throw 'SysWatch did not reopen after the silent update.' }
