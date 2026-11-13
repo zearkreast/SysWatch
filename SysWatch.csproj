@@ -14,7 +14,7 @@
     <ServerGarbageCollection>false</ServerGarbageCollection>
     <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
-    <Version>1.0.0</Version>
+    <Version>1.2.0</Version>
     <Product>SysWatch</Product>
     <Authors>zearkreast</Authors>
     <Company>zearkreast</Company>
