@@ -1,9 +1,12 @@
 <p align="center">
-  <img src="docs/social-preview.tr.png" alt="SysWatch: ısınınca ya da zorlanınca haber veren hafif tepsi uygulaması">
+  <img src="docs/logo.png" width="112" alt="SysWatch logosu">
 </p>
 
+<h1 align="center">SysWatch</h1>
+
 <p align="center">
-  <a href="README.md">English</a> · <b>Türkçe</b>
+  Bilgisayarınız ısınınca ya da zorlanınca haber veren hafif bir Windows tepsi uygulaması.<br>
+  <sub><a href="README.md">English</a> · <b>Türkçe</b></sub>
 </p>
 
 <p align="center">
@@ -17,6 +20,10 @@
 <p align="center">
   <a href="https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-setup.exe"><img alt="Kurulum dosyasını indir" src="https://img.shields.io/badge/Kurulum-%C4%B0ndir-0078D4?style=for-the-badge&logo=windows&logoColor=white"></a>
   <a href="https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-portable.zip"><img alt="Taşınabilir sürümü indir" src="https://img.shields.io/badge/Ta%C5%9F%C4%B1nabilir-%C4%B0ndir-5C6BC0?style=for-the-badge&logo=files&logoColor=white"></a>
+</p>
+
+<p align="center">
+  <img src="docs/screens/light-tr.png" width="860" alt="SysWatch ana penceresi ve sağ tık paneli, açık tema">
 </p>
 
 CPU veya GPU sıcaklığı, işlemci, ekran kartı ya da RAM kullanımı belirlediğiniz eşiği belirli bir süre aşınca SysWatch size haber verir. Bildirim Windows'un kendisinden, Telegram'dan, Discord'dan, e-postadan (isteğe bağlı PGP ile) ya da Signal'den gelebilir. Evde değilken Telegram, Discord veya Signal'den durumu sorabilir, takılan bir programı kapatabilir ya da bilgisayarı kapatabilirsiniz.

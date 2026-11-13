@@ -1,9 +1,12 @@
 <p align="center">
-  <img src="docs/social-preview.png" alt="SysWatch: a lightweight tray app that alerts you when your PC runs hot or under heavy load">
+  <img src="docs/logo.png" width="112" alt="SysWatch logo">
 </p>
 
+<h1 align="center">SysWatch</h1>
+
 <p align="center">
-  <b>English</b> · <a href="README.tr.md">Türkçe</a>
+  A lightweight Windows tray app that alerts you when your PC runs hot or under heavy load.<br>
+  <sub><b>English</b> · <a href="README.tr.md">Türkçe</a></sub>
 </p>
 
 <p align="center">
@@ -17,6 +20,10 @@
 <p align="center">
   <a href="https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-setup.exe"><img alt="Download the installer" src="https://img.shields.io/badge/Installer-Download-0078D4?style=for-the-badge&logo=windows&logoColor=white"></a>
   <a href="https://github.com/zearkreast/SysWatch/releases/latest/download/SysWatch_x64-portable.zip"><img alt="Download the portable build" src="https://img.shields.io/badge/Portable-Download-5C6BC0?style=for-the-badge&logo=files&logoColor=white"></a>
+</p>
+
+<p align="center">
+  <img src="docs/screens/light-en.png" width="860" alt="The SysWatch main window and right-click panel, light theme">
 </p>
 
 SysWatch tells you when CPU or GPU temperature, or CPU, GPU or RAM usage, stays above a threshold you set. Alerts can come from Windows itself, Telegram, Discord, e-mail (optionally PGP-encrypted) or Signal. When you're away, you can ask for the status from Telegram, Discord or Signal, close a program that hangs, or shut the PC down.
