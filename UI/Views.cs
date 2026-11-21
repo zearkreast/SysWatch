@@ -20,6 +20,7 @@ internal sealed class DashboardView : Panel
     // Name, hardware and type of each charted sensor, so a card is labelled even before its first reading.
     private readonly Dictionary<string, SensorSample> _meta = new();
     private string _layoutKey = "\0";
+    private (Snapshot?, AppConfig, string) _filled;
     private bool _editing;
 
     public DashboardView(IUiHost app, Font font, Action openDetails)
@@ -55,7 +56,7 @@ internal sealed class DashboardView : Panel
 
         Controls.Add(_grid);
         Controls.Add(_bottom);
-        _refresh.Tick += (_, _) => RefreshValues();
+        _refresh.Tick += (_, _) => { if (!this.Minimized()) RefreshValues(); };
         VisibleChanged += (_, _) =>
         {
             if (Visible) { RefreshValues(); _refresh.Start(); }
@@ -135,14 +136,17 @@ internal sealed class DashboardView : Panel
     public void RefreshValues()
     {
         if (string.Join("\n", Charts) != _layoutKey) Rebuild();
-        else Fill();
+        else if (FillState() != _filled) Fill();
     }
+
+    // Readings arrive every few seconds but the timer ticks every second; nothing is redrawn until one of these changes.
+    private (Snapshot?, AppConfig, string) FillState() => (_app.LastSnapshot, _app.Config, string.Join(",", _app.ActiveAlerts));
 
     private void Fill()
     {
-        var snap = _app.LastSnapshot;
+        _filled = FillState();
+        var (snap, cfg, _) = _filled;
         var active = _app.ActiveAlerts;
-        var cfg = _app.Config;
         var hist = _app.History;
 
         void FillBuiltIn(MetricCard card, string label, Metric main, Metric? secondary)
@@ -528,6 +532,7 @@ internal sealed class DetailsView : Panel
     private readonly IUiHost _app;
     private readonly SensorTree _tree;
     private readonly System.Windows.Forms.Timer _refresh = new() { Interval = 2000 };
+    private (Snapshot?, AppConfig) _loaded;
 
     public DetailsView(IUiHost app, Font font, Action back, Action openHardware)
     {
@@ -553,7 +558,7 @@ internal sealed class DetailsView : Panel
         };
         Controls.Add(_tree);
         Controls.Add(header);
-        _refresh.Tick += (_, _) => Reload();
+        _refresh.Tick += (_, _) => { if (!this.Minimized() && (_app.LastSnapshot, _app.Config) != _loaded) Reload(); };
         VisibleChanged += (_, _) =>
         {
             if (Visible) { Reload(); _refresh.Start(); }
@@ -573,7 +578,8 @@ internal sealed class DetailsView : Panel
 
     private void Reload()
     {
-        var hw = _app.Config.Hardware;
+        _loaded = (_app.LastSnapshot, _app.Config);
+        var hw = _loaded.Item2.Hardware;
         var off = new List<(string Name, string Icon)>();
         if (!hw.Cpu) off.Add((L.T("İşlemci (CPU)", "Processor (CPU)"), Icons.Hardware));
         if (!hw.Gpu) off.Add((L.T("Ekran kartı (GPU)", "Graphics card (GPU)"), Icons.Gpu));

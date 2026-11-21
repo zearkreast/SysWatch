@@ -25,7 +25,7 @@ internal sealed class SensorTree : ScrollableControl
 
     private readonly List<Row> _rows = new();
     private readonly HashSet<string> _collapsed = new();
-    private readonly Font _bold, _headerFont;
+    private readonly Font _bold, _headerFont, _underline;
     private readonly Action? _openHardware;
     private List<SensorGroup> _groups = new();
     private List<(string Name, string Icon)> _off = new();
@@ -48,6 +48,7 @@ internal sealed class SensorTree : ScrollableControl
         Font = font;
         _bold = new Font(font, FontStyle.Bold);
         _headerFont = new Font(font.FontFamily, font.Size * 0.95f);
+        _underline = new Font(font, FontStyle.Underline);
         _openHardware = openHardware;
         AutoScroll = true;
     }
@@ -341,8 +342,7 @@ internal sealed class SensorTree : ScrollableControl
         }
         var link = LinkRect(r);
         Draw.Text(g, row.Node.Text, Font, Theme.TextMuted, new Rectangle(r.X + osz + 18, r.Y, link.X - r.X - osz - 24, r.Height));
-        using var lf = new Font(Font, hover ? FontStyle.Underline : FontStyle.Regular);
-        Draw.Text(g, LinkText, lf, Theme.Accent, link, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
+        Draw.Text(g, LinkText, hover ? _underline : Font, Theme.Accent, link, TextFormatFlags.VerticalCenter | TextFormatFlags.Right);
     }
 
     private int RowAt(Point p)
@@ -371,13 +371,22 @@ internal sealed class SensorTree : ScrollableControl
         var i = RowAt(e.Location);
         if (!Interactive(i)) i = -1;
         Cursor = i >= 0 && (_rows[i].Node.Children.Count > 0 || _rows[i].Node.Kind == Kind.Off || Pickable) ? Cursors.Hand : Cursors.Default;
-        if (i != _hover) { _hover = i; Invalidate(); }
+        SetHover(i);
     }
 
-    protected override void OnMouseLeave(EventArgs e)
+    protected override void OnMouseLeave(EventArgs e) => SetHover(-1);
+
+    private void SetHover(int i)
     {
-        _hover = -1;
-        Invalidate();
+        if (i == _hover) return;
+        InvalidateRow(_hover);
+        _hover = i;
+        InvalidateRow(i);
+    }
+
+    private void InvalidateRow(int i)
+    {
+        if (i >= 0 && i < _rows.Count) Invalidate(new Rectangle(0, _rows[i].Top + AutoScrollPosition.Y, Width, _rows[i].Height));
     }
 
     protected override void OnMouseClick(MouseEventArgs e)
@@ -440,6 +449,7 @@ internal sealed class SensorTree : ScrollableControl
             Theme.Changed -= OnThemeChanged;
             _bold.Dispose();
             _headerFont.Dispose();
+            _underline.Dispose();
         }
         base.Dispose(disposing);
     }

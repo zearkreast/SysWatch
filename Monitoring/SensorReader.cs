@@ -194,11 +194,17 @@ public sealed class SensorReader : IDisposable
         }
     }
 
+    private List<SensorGroup>? _allSensors;
+
     // Every sensor of every open hardware group, with the values from the last reading (no extra hardware access).
+    // Called on the UI thread: while a reading holds the lock (a detailed-storage update can take hundreds of ms) it
+    // returns the previous list instead of freezing the window.
     public List<SensorGroup> AllSensors()
     {
+        if (_allSensors is not { } cached) Monitor.Enter(_gate);
+        else if (!Monitor.TryEnter(_gate)) return cached;
         var groups = new List<SensorGroup>();
-        lock (_gate)
+        try
         {
             if (_computer != null)
             {
@@ -239,7 +245,11 @@ public sealed class SensorReader : IDisposable
                 ]));
             }
         }
-        return groups;
+        finally
+        {
+            Monitor.Exit(_gate);
+        }
+        return _allSensors = groups;
     }
 
     private SensorItem NativeItem(string id, string name, string type, double value)

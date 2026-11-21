@@ -145,11 +145,15 @@ internal static class Diagnostics
                 GC.Collect(2, GCCollectionMode.Aggressive, blocking: true, compacting: true);
                 GC.WaitForPendingFinalizers();
             }
-            void Window(string name, Form form)
+            void Window(string name, Func<Form> create)
             {
+                var watch = Stopwatch.StartNew();
+                var form = create();
                 form.StartPosition = FormStartPosition.Manual;
                 form.Location = new Point(-5000, -5000);
                 form.Show();
+                Application.DoEvents();
+                sb.AppendLine($"{name} shown in {watch.ElapsedMilliseconds} ms");
                 for (var i = 0; i < 5; i++) { Application.DoEvents(); Thread.Sleep(200); }
                 Stage($"{name} open");
                 form.Close();
@@ -158,7 +162,8 @@ internal static class Diagnostics
                 Compact();
                 Stage($"{name} closed");
             }
-            Window("main window", new UI.MainWindow(host));
+            Window("main window", () => new UI.MainWindow(host));
+            Window("main window again", () => new UI.MainWindow(host));
         }
 
         using (var p = Process.GetCurrentProcess())

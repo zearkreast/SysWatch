@@ -17,6 +17,9 @@ internal static class Draw
         return p;
     }
 
+    // A minimized window stays Visible, so refresh timers have to check this themselves.
+    public static bool Minimized(this Control c) => c.FindForm() is { WindowState: FormWindowState.Minimized };
+
     public static void Setup(Graphics g)
     {
         g.SmoothingMode = SmoothingMode.AntiAlias;

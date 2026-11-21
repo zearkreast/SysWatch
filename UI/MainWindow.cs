@@ -61,8 +61,10 @@ public sealed class MainWindow : AeroForm
     private int _trayColorIndex;
 
     private readonly Panel _host = new() { Dock = DockStyle.Fill, Padding = new Padding(16, 12, 16, 0) };
-    private readonly List<Panel> _pages = new();
+    private readonly Panel?[] _pages = new Panel?[8];
+    private Func<Panel>[] _pageBuilders = null!;
     private readonly Dictionary<string, Panel> _channelPages = new();
+    private Dictionary<string, Func<Panel>> _channelBuilders = null!;
     private readonly Dictionary<string, StatusRow> _channelRows = new();
     private readonly Label _dirtyLabel = new() { AutoSize = true, Tag = "muted", Text = "" };
     private NavList _nav = null!;
@@ -70,8 +72,7 @@ public sealed class MainWindow : AeroForm
     private bool _dirty;
     private Panel _footer = null!;
     private Panel _footerButtons = null!;
-    private DashboardView _dashboard = null!;
-    private DetailsView _details = null!;
+    private Panel? _details;
     private readonly System.Windows.Forms.Timer _statusTimer = new() { Interval = 2000 };
     private string _status = "";
     private Color _statusColor = Theme.Success;
@@ -113,25 +114,17 @@ public sealed class MainWindow : AeroForm
         _nav.Add(Icons.App, L.T("Uygulama", "App"));
         _nav.SelectedChanged += ShowPage;
 
-        _pages.Add(_dashboard = new DashboardView(app, Font, () => ShowPanel(_details)));
-        _pages.Add(new HistoryView(app, Font));
-        _pages.Add(ThresholdTab());
-        _pages.Add(ChannelsPage());
-        _pages.Add(AppearancePage());
-        _pages.Add(HardwarePage());
-        _pages.Add(SecurityPage());
-        _pages.Add(AppPage());
-        _details = new DetailsView(app, Font, () => ShowPanel(_pages[PageStatus]), () => ShowSection(PageHardware));
-        _channelPages["Windows"] = WindowsTab();
-        _channelPages["Telegram"] = TelegramTab();
-        _channelPages["Discord"] = DiscordTab();
-        _channelPages["E-posta"] = EmailTab();
-        _channelPages["Signal"] = SignalTab();
-        foreach (var page in _pages.Concat(_channelPages.Values).Append(_details))
+        _pageBuilders =
+        [
+            () => new DashboardView(app, Font, ShowDetails),
+            () => new HistoryView(app, Font),
+            ThresholdTab, ChannelsPage, AppearancePage, HardwarePage, SecurityPage, AppPage,
+        ];
+        _channelBuilders = new()
         {
-            page.Visible = false;
-            _host.Controls.Add(page);
-        }
+            ["Windows"] = WindowsTab, ["Telegram"] = TelegramTab, ["Discord"] = DiscordTab, ["E-posta"] = EmailTab, ["Signal"] = SignalTab,
+        };
+        CreateInputs();
 
         var footer = _footer = new Panel { Dock = DockStyle.Bottom, Height = (int)(unit * 3), Padding = new Padding(unit, 0, unit, 0) };
         var save = new FlatButton(L.T("Kaydet", "Save"), primary: true);
@@ -157,7 +150,6 @@ public sealed class MainWindow : AeroForm
         _loading = true;
         LoadValues();
         _loading = false;
-        TrackChanges(this);
         ShowPage(PageStatus);
         _statusTimer.Tick += (_, _) => UpdateStatus();
         _statusTimer.Start();
@@ -324,7 +316,51 @@ public sealed class MainWindow : AeroForm
         _nav.BackColor = Theme.Window;
     }
 
-    private void ShowPage(int index) => ShowPanel(_pages[index]);
+    private void ShowPage(int index) => ShowPanel(_pages[index] ??= Adopt(_pageBuilders[index](), track: index >= PageSettings));
+
+    // Untracked: its search box isn't a setting and mustn't count as an unsaved change.
+    private void ShowDetails() =>
+        ShowPanel(_details ??= Adopt(new DetailsView(_app, Font, () => ShowPage(PageStatus), () => ShowSection(PageHardware)), track: false));
+
+    private Panel ChannelPage(string name) =>
+        _channelPages.TryGetValue(name, out var page) ? page : _channelPages[name] = Adopt(_channelBuilders[name]());
+
+    // Pages are built on first show. The inputs exist from the start (CreateInputs), so LoadValues and Collect don't
+    // depend on which pages were opened.
+    private Panel Adopt(Panel page, bool track = true)
+    {
+        page.Visible = false;
+        page.BackColor = Color.Transparent;
+        _host.Controls.Add(page);
+        Theme.ApplyControls(page);
+        if (track) TrackChanges(page);
+        return page;
+    }
+
+    private static (string Key, string Label)[] HardwareKeys =>
+    [
+        ("Cpu", "CPU"), ("Gpu", "GPU"), ("GpuDetailed", L.T("GPU ayrıntılı (+40 MB)", "GPU detailed (+40 MB)")), ("Storage", L.T("Diskler", "Disks")),
+        ("StorageDetailed", L.T("Disk ayrıntılı (+40 MB)", "Disk detailed (+40 MB)")), ("Motherboard", L.T("Anakart", "Motherboard")),
+        ("Memory", L.T("RAM modülleri", "Memory modules")), ("Controller", L.T("Fan kontrolcüleri", "Fan controllers")), ("Network", L.T("Ağ", "Network")), ("Psu", "PSU"),
+    ];
+
+    private void CreateInputs()
+    {
+        foreach (var (key, label) in HardwareKeys) _hw[key] = new CheckBox { Text = label, AutoSize = true };
+        foreach (var m in Enum.GetValues<Metric>())
+            _trayReadings[m] = new CheckBox { Text = MetricInfo.Label(m), AutoSize = true, Margin = new Padding(0, 3, 14, 3) };
+        _grid.Dock = DockStyle.Fill;
+        _grid.AllowUserToAddRows = false;
+        _grid.AllowUserToDeleteRows = false;
+        _grid.RowHeadersVisible = false;
+        _grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        _grid.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = L.T("Açık", "On"), FillWeight = 40 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("Metrik", "Metric"), ReadOnly = true, FillWeight = 130 });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("Eşik", "Threshold") });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("Süre (sn)", "Duration (s)") });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("Tekrar (dk)", "Repeat (min)") });
+        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("Histerezis", "Hysteresis") });
+    }
 
     // Cross-fades between pages. Both pages are snapshotted and the overlay is opaque, so nothing half-drawn
     // shows; redraw of the host is suspended while the pages swap.
@@ -336,7 +372,7 @@ public sealed class MainWindow : AeroForm
         var before = animate ? Snapshot() : null;
         if (_host.IsHandleCreated) SendMessage(_host.Handle, 0x000B, IntPtr.Zero, IntPtr.Zero); // WM_SETREDRAW off
         foreach (Control c in _host.Controls) if (c is not FadeOverlay) c.Visible = c == panel;
-        _footerButtons.Visible = _pages.IndexOf(panel) >= PageSettings || _channelPages.ContainsValue(panel);
+        _footerButtons.Visible = Array.IndexOf(_pages, panel) >= PageSettings || _channelPages.ContainsValue(panel);
         if (!_footerButtons.Visible) _dirtyLabel.Text = "";
         else if (_dirty) _dirtyLabel.Text = L.T("Kaydedilmemiş değişiklik var", "Unsaved changes");
         if (panel == _pages[PageChannels]) RefreshChannelRows();
@@ -408,7 +444,7 @@ public sealed class MainWindow : AeroForm
 
     private void OpenChannel(string name)
     {
-        ShowPanel(_channelPages[name]);
+        ShowPanel(ChannelPage(name));
     }
 
     private void TrackChanges(Control root)
@@ -514,13 +550,7 @@ public sealed class MainWindow : AeroForm
         var t = Table();
         SpanRow(t, Heading(L.T("Donanım", "Hardware"), Icons.Hardware));
         var hwPanel = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false, FlowDirection = FlowDirection.TopDown };
-        foreach (var (key, label) in new[] { ("Cpu", "CPU"), ("Gpu", "GPU"), ("GpuDetailed", L.T("GPU ayrıntılı (+40 MB)", "GPU detailed (+40 MB)")), ("Storage", L.T("Diskler", "Disks")), ("StorageDetailed", L.T("Disk ayrıntılı (+40 MB)", "Disk detailed (+40 MB)")), ("Motherboard", L.T("Anakart", "Motherboard")),
-                     ("Memory", L.T("RAM modülleri", "Memory modules")), ("Controller", L.T("Fan kontrolcüleri", "Fan controllers")), ("Network", L.T("Ağ", "Network")), ("Psu", "PSU") })
-        {
-            var cb = new CheckBox { Text = label, AutoSize = true };
-            _hw[key] = cb;
-            hwPanel.Controls.Add(cb);
-        }
+        foreach (var (key, _) in HardwareKeys) hwPanel.Controls.Add(_hw[key]);
         Row(t, L.T("Okunan donanım", "Hardware to read"), hwPanel);
         Row(t, "", Note(L.T("Az donanım = daha hafif. RAM her zaman, GPU ve disk varsayılan olarak Windows'tan okunur.\n" +
                         "\"Ayrıntılı\" seçenekler üretici kütüphanelerini / SMART okumayı yükler: daha çok sensör, her biri ~40 MB daha fazla bellek.", "Less hardware = lighter. RAM is always read from Windows, and so are GPU and disk by default.\n" +
@@ -553,7 +583,7 @@ public sealed class MainWindow : AeroForm
         var title = channel == "Windows" ? L.T("Windows bildirimi", "Windows notifications") : L.Channel(channel);
         var bar = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = false, Margin = new Padding(0, 0, 0, 8) };
         var back = new LinkLabel { Text = L.T("‹ Kanallar", "‹ Channels"), AutoSize = true, Margin = new Padding(0, 6, 12, 0) };
-        back.LinkClicked += (_, _) => ShowPanel(_pages[PageChannels]);
+        back.LinkClicked += (_, _) => ShowPage(PageChannels);
         bar.Controls.Add(back);
         bar.Controls.Add(Heading(title, "brand:" + channel));
         return bar;
@@ -567,12 +597,7 @@ public sealed class MainWindow : AeroForm
         Row(t, L.T("Tema", "Theme"), _uiTheme);
         Row(t, "", _reduceMotion);
         var readings = new FlowLayoutPanel { AutoSize = true, Dock = DockStyle.Fill, WrapContents = true, MaximumSize = new Size(Font.Height * 26, 0) };
-        foreach (var m in Enum.GetValues<Metric>())
-        {
-            var cb = new CheckBox { Text = MetricInfo.Label(m), AutoSize = true, Margin = new Padding(0, 3, 14, 3) };
-            _trayReadings[m] = cb;
-            readings.Controls.Add(cb);
-        }
+        foreach (var cb in _trayReadings.Values) readings.Controls.Add(cb);
         Row(t, L.T("Tepside sayılar", "Tray numbers"), readings);
         Row(t, L.T("Sayı rengi", "Number color"), _trayColor);
         _trayColor.SelectedIndexChanged += (_, _) =>
@@ -670,18 +695,6 @@ public sealed class MainWindow : AeroForm
 
     private Panel ThresholdTab()
     {
-        _grid.Dock = DockStyle.Fill;
-        _grid.AllowUserToAddRows = false;
-        _grid.AllowUserToDeleteRows = false;
-        _grid.RowHeadersVisible = false;
-        _grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-        _grid.Columns.Add(new DataGridViewCheckBoxColumn { HeaderText = L.T("Açık", "On"), FillWeight = 40 });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("Metrik", "Metric"), ReadOnly = true, FillWeight = 130 });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("Eşik", "Threshold") });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("Süre (sn)", "Duration (s)") });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("Tekrar (dk)", "Repeat (min)") });
-        _grid.Columns.Add(new DataGridViewTextBoxColumn { HeaderText = L.T("Histerezis", "Hysteresis") });
-
         var panel = new Panel { Dock = DockStyle.Fill };
         panel.Controls.Add(_grid);
         panel.Controls.Add(new Label

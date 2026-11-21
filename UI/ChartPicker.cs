@@ -83,8 +83,14 @@ internal sealed class ChartPicker : AeroForm
 
         Controls.Add(body);
         Controls.Add(bottom);
+        var shown = _app.LastSnapshot;
         _tree.SetData(_app.Sensors());
-        _refresh.Tick += (_, _) => _tree.SetData(_app.Sensors());
+        _refresh.Tick += (_, _) =>
+        {
+            if (_app.LastSnapshot == shown) return;
+            shown = _app.LastSnapshot;
+            _tree.SetData(_app.Sensors());
+        };
         Shown += (_, _) => { _refresh.Start(); search.Focus(); };
     }
 
