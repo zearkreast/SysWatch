@@ -315,6 +315,18 @@ public sealed class TrayApp : ApplicationContext, IUiHost
             return;
         }
         if ((DateTime.Now - _popupClosedAt).TotalMilliseconds < 300) return;
+        // Time from the click reaching the queue to the handler, and from there to the queue going idle (popup painted).
+        var waited = unchecked(Environment.TickCount - GetMessageTime());
+        var watch = System.Diagnostics.Stopwatch.StartNew();
+        void Painted(object? s, EventArgs e)
+        {
+            Application.Idle -= Painted;
+            var total = waited + watch.ElapsedMilliseconds;
+            if (total >= SlowPopupMs)
+                Log.Warn(L.T($"Sağ tık menüsü {total} ms'de açıldı (tıklama sırada {waited} ms bekledi, menü {watch.ElapsedMilliseconds} ms'de çizildi)",
+                    $"Tray popup took {total} ms to open (click queued {waited} ms, popup drawn in {watch.ElapsedMilliseconds} ms)"));
+        }
+        Application.Idle += Painted;
         _popup = new TrayPopup(this, OpenMain, ExitThread);
         _popup.FormClosed += (_, _) =>
         {
@@ -521,6 +533,11 @@ public sealed class TrayApp : ApplicationContext, IUiHost
 
     [DllImport("user32.dll")]
     private static extern bool DestroyIcon(IntPtr handle);
+
+    [DllImport("user32.dll")]
+    private static extern int GetMessageTime();
+
+    private const int SlowPopupMs = 250;
 
     protected override void ExitThreadCore()
     {
